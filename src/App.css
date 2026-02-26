@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/forms";
 
 :root {
   font-family: "Lexend", sans-serif;
@@ -17,6 +18,12 @@
   -webkit-text-size-adjust: 100%;
 }
 
+html, body, #root {
+    background: transparent;
+    overflow: hidden;
+    height: 100%;
+}
+
 .container {
   margin: 0;
   padding-top: 10vh;
@@ -26,7 +33,147 @@
   text-align: center;
 }
 
+.language-picker, .milkdown-latex-inline-edit {
+    color: black;
+}
+
+.milkdown,
+.crepe,
+.editor {
+    background: #373637;
+    color: white;
+    --crepe-color-on-background: white;
+}
+
+.milkdown-code-block, .cm-editor {
+    background: #575958 !important;
+}
+
+.crepe-placeholder {
+    color: white;
+}
+
+/* The actual editable surface */
+.milkdown .ProseMirror,
+.crepe .ProseMirror {
+  background: var(--app-bg) !important;
+  color: var(--text) !important;
+  line-height: 1.65;
+  font-size: 16px;
+  outline: none;
+}
+
+/* Links */
+.milkdown .ProseMirror a,
+.crepe .ProseMirror a {
+  color: #9bd1ff;
+  text-decoration: none;
+}
+.milkdown .ProseMirror a:hover,
+.crepe .ProseMirror a:hover {
+  text-decoration: underline;
+}
+
+/* Headings */
+.milkdown .ProseMirror h1,
+.crepe .ProseMirror h1 {
+  font-size: 40px;
+  font-weight: 800;
+  margin: 8px 0 18px;
+}
+.milkdown .ProseMirror h2,
+.crepe .ProseMirror h2 {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 22px 0 12px;
+}
+
+/* Paragraph spacing */
+.milkdown .ProseMirror p,
+.crepe .ProseMirror p {
+  margin: 10px 0;
+}
+
+/* Blockquote / callout-ish */
+.milkdown .ProseMirror blockquote,
+.crepe .ProseMirror blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  color: var(--muted);
+}
+
+/* Inline code */
+.milkdown .ProseMirror code,
+.crepe .ProseMirror code {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.10);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+/* Code fences */
+.milkdown .ProseMirror pre,
+.crepe .ProseMirror pre {
+  background: var(--code-bg) !important;
+  border: 1px solid var(--code-border) !important;
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow: auto;
+}
+
+/* Crepe “Preview” label / header bars (these classnames vary, so we use broad matches) */
+.milkdown [class*="preview"],
+.crepe [class*="preview"],
+.milkdown [class*="toolbar"],
+.crepe [class*="toolbar"] {
+  color: var(--muted) !important;
+  background: transparent !important;
+  border-color: var(--border) !important;
+}
+
+/* Selection + cursor */
+.milkdown .ProseMirror ::selection,
+.crepe .ProseMirror ::selection {
+  background: rgba(120,170,255,.25);
+}
+
+/* KaTeX should be light on dark */
+.katex {
+  color: white;
+}
+
+/* Math blocks: keep them on dark background instead of white */
+.katex-display {
+  background: transparent;
+}
+
 @theme {
     --color-button-primary: #7899D4;
     --color-button-secondary: #7E7E7E;
+    --color-background-primary: #373637;
+    --color-background-secondary: #7E7E7E;
+}
+
+@layer components {
+    .active-tab {
+        @apply flex bg-background-primary w-50 px-2 pb-1 mt-2 rounded-t-md overflow-hidden text-left justify-between items-center;
+    }
+    .tab:hover {
+        @apply flex px-2 mt-2 mb-1 w-50 text-start rounded-md bg-[#595758] justify-between items-center;
+    }
+    .tab {
+        @apply flex mt-2 mb-1 px-2 w-50 text-start justify-between items-center;
+    }
+    .nodrag {
+        -webkit-app-region: no-drag;
+    }
+    .tree-row {
+        @apply relative flex items-center gap-2 h-8 px-2 mx-1 rounded-md;
+    }
+    .tree-row:hover {
+        @apply bg-background-secondary/60;
+    }
+    .tree-label {
+        @apply truncate;
+    }
 }
