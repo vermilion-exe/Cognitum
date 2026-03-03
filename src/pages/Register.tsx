@@ -2,6 +2,7 @@ import { useState, useContext } from 'react';
 import { UserContext } from '../components/UserProvider';
 import { MainHeader } from '../components';
 import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/core';
 
 function Register() {
     const [username, setUsername] = useState('');
@@ -13,8 +14,15 @@ function Register() {
         navigate('/');
     }
 
-    function handleRegister() {
-        navigate('MainPage.tsx');
+    async function handleRegister() {
+        const cfg = await invoke<{ vaultPath?: string }>("load_config");
+
+        if (!cfg.vaultPath) {
+            navigate('/choosePath');
+        }
+        else {
+            navigate('/mainPage');
+        }
     }
 
     return (

@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { MainHeader } from "../components";
+import { invoke } from "@tauri-apps/api/core";
 
 function Home() {
     const navigate = useNavigate();
@@ -12,8 +13,15 @@ function Home() {
         navigate('/register');
     }
 
-    function handleGuest() {
-        navigate('/mainPage');
+    async function handleGuest() {
+        const cfg = await invoke<{ vaultPath?: string }>("load_config");
+
+        if (!cfg.vaultPath) {
+            navigate('/choosePath');
+        }
+        else {
+            navigate('/mainPage');
+        }
     }
 
     return (

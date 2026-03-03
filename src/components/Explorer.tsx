@@ -3,6 +3,8 @@ import addFileIcon from "../assets/add_file.svg";
 import addDirectoryIcon from "../assets/add_directory.svg";
 import uploadIcon from "../assets/upload.svg";
 import { invoke } from '@tauri-apps/api/core';
+import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 export type FsNode = {
     id: string;                 // stable unique id (full path is fine)
@@ -17,6 +19,9 @@ function Explorer() {
     //     path: rootPath,
     //     recursive: true,
     // });
+    const navigate = useNavigate();
+    const [root, setRoot] = useState<FsNode>();
+    loadTree();
 
     const rootChildren: FsNode[] = [
         {
@@ -55,6 +60,30 @@ function Explorer() {
             "children": []
         }
     ];
+
+    async function loadTree() {
+        const cfg = await invoke<{ vaultPath?: string }>("load_config");
+
+        if (!cfg || !cfg.vaultPath) {
+            navigate("choosePath");
+        }
+        else {
+            const children = await invoke<FsNode[]>("scan_dir", {
+                path: cfg.vaultPath,
+                recursive: true,
+            });
+
+            const root: FsNode = {
+                id: cfg.vaultPath,
+                name: cfg.vaultPath.split(/[\\/]/).filter(Boolean).pop() ?? cfg.vaultPath,
+                kind: "dir",
+                isOpen: true,
+                children: children,
+            };
+
+            setRoot(root);
+        }
+    }
 
     {/* return (
         <div>
@@ -100,7 +129,7 @@ function Explorer() {
                 <button><img src={addDirectoryIcon} className='w-7 h-7' /></button>
                 <button><img src={uploadIcon} className='w-7 h-7' /></button>
             </div>
-            <ExplorerTree nodes={rootChildren} isRoot={true} />
+            <ExplorerTree nodes={root?.children ?? []} isRoot={true} />
         </div>
     );
 }

@@ -2,6 +2,7 @@ import { useState, useContext } from 'react';
 import { UserContext } from '../components/UserProvider';
 import { MainHeader } from '../components';
 import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/core';
 
 function Login() {
     const [email, setEmail] = useState('');
@@ -12,8 +13,15 @@ function Login() {
         navigate('/');
     }
 
-    function handleLogin() {
-        navigate('/mainPage');
+    async function handleLogin() {
+        const cfg = await invoke<{ vaultPath?: string }>("load_config");
+
+        if (!cfg.vaultPath) {
+            navigate('/choosePath');
+        }
+        else {
+            navigate('/mainPage');
+        }
     }
 
     return (
