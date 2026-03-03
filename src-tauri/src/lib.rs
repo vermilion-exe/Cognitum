@@ -72,7 +72,18 @@ fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode>> {
         let p = entry.path();
         let file_type = entry.file_type()?;
 
-        let name = entry.file_name().to_string_lossy().to_string();
+        let name = if file_type.is_file()
+            && p.extension()
+                .and_then(|e| e.to_str())
+                .map_or(false, |e| e.eq_ignore_ascii_case("md"))
+        {
+            p.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default()
+                .to_string()
+        } else {
+            entry.file_name().to_string_lossy().to_string()
+        };
 
         let id = p.to_string_lossy().to_string();
 

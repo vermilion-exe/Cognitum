@@ -2,7 +2,8 @@ import { FsNode } from "./Explorer";
 import directoryIcon from "../assets/directory.svg";
 import openDirectoryIcon from "../assets/directory_open.svg";
 
-function ExplorerTree({ nodes, depthPipes = [], isRoot, }: { nodes: FsNode[]; depthPipes?: boolean[]; isRoot: boolean; }) {
+function ExplorerTree({ nodes, depthPipes = [], isRoot, openIds, toggleOpen }: { nodes: FsNode[]; depthPipes?: boolean[]; isRoot: boolean; openIds: Set<String>; toggleOpen: (id: string) => void; }) {
+
     return (
         <div className={`flex flex-col gap-2 ${!isRoot ? "ml-9" : ""}`}>
             {
@@ -12,11 +13,11 @@ function ExplorerTree({ nodes, depthPipes = [], isRoot, }: { nodes: FsNode[]; de
 
                     return (
                         <div key={node.id}>
-                            <TreeRow node={node} pipes={depthPipes} isLast={isLast} />
+                            <TreeRow node={node} pipes={depthPipes} isLast={isLast} isOpen={openIds.has(node.id)} toggleOpen={() => toggleOpen(node.id)} />
 
-                            {node.kind === "dir" && node.isOpen && node.children?.length ? (
+                            {node.kind === "dir" && openIds.has(node.id) && node.children?.length ? (
                                 <div>
-                                    <ExplorerTree nodes={node.children} depthPipes={nextPipes} isRoot={false} />
+                                    <ExplorerTree nodes={node.children} depthPipes={nextPipes} isRoot={false} openIds={openIds} toggleOpen={toggleOpen} />
                                 </div>
                             ) : null}
                         </div>
@@ -27,9 +28,9 @@ function ExplorerTree({ nodes, depthPipes = [], isRoot, }: { nodes: FsNode[]; de
     );
 }
 
-function TreeRow({ node, pipes, isLast, }: { node: FsNode; pipes: boolean[]; isLast: boolean; }) {
+function TreeRow({ node, pipes, isLast, isOpen, toggleOpen, }: { node: FsNode; pipes: boolean[]; isLast: boolean; isOpen: boolean; toggleOpen: () => void; }) {
     return (
-        <div className="tree-row">
+        <div className="tree-row" onClick={toggleOpen}>
             <div className='flex items-stretch'>
                 {pipes.map((on, i) => (
                     <div key={i} className="relative">
@@ -45,7 +46,7 @@ function TreeRow({ node, pipes, isLast, }: { node: FsNode; pipes: boolean[]; isL
             </div>
 
             <div className="flex items-center gap-2 min-w-0">
-                {node.kind === "dir" ? (node.isOpen ? (<img className="w-7 h-7" src={openDirectoryIcon} />) : (<img className="w-6 h-6" src={directoryIcon} />)) : null}
+                {node.kind === "dir" ? (isOpen ? (<img className="w-7 h-7" src={openDirectoryIcon} />) : (<img className="w-6 h-6" src={directoryIcon} />)) : null}
                 <span className="tree-label truncate">{node.name}</span>
             </div>
         </div>
