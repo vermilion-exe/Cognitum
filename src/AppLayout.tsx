@@ -14,6 +14,7 @@ export default function AppLayout() {
     const [explorerHidden, setExplorerHidden] = useState(false);
     const [root, setRoot] = useState<FsNode>();
     const [openIds, setOpenIds] = useState<Set<String>>(() => new Set());
+    const [activeFileId, setActiveFileId] = useState<String>();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -49,14 +50,39 @@ export default function AppLayout() {
         };
     }, [navigate]);
 
-    const toggleOpen = (id: string) => {
-        setOpenIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
+    const toggleOpen = (e: React.MouseEvent, node: FsNode) => {
+        if (node.kind === "dir") {
+            setOpenIds(prev => {
+                const next = new Set(prev);
+                if (next.has(node.id)) next.delete(node.id);
+                else next.add(node.id);
+                return next;
+            });
+        }
+        else {
+            setOpenIds(prev => {
+                const next = new Set(prev);
+                if(!e.shiftKey && activeFileId && activeFileId !== node.id && !next.has(node.id)) next.delete(activeFileId);
+                if (!next.has(node.id)) next.add(node.id);
+                setActiveFileId(node.id);
+                return next;
+            });
+        }
     };
+
+    const closeFile = (id: String) => {
+        openIds.delete(id);
+        if (activeFileId === id) setActiveFileId(undefined);
+    }
+
+    function collectAllNodes(nodes: FsNode[]): FsNode[] {
+        return nodes.flatMap(node => node.children ? [node, ...collectAllNodes(node.children)] : [node]);
+    }
+
+    const getFileNodes = () => {
+        return collectAllNodes(root?.children ?? [])
+            .filter(node => openIds.has(node.id) && node.kind === "file") ?? [];
+    }
 
     return (
         <div className="flex h-screen w-screen min-h-0 overflow-hidden text-white">
@@ -70,7 +96,7 @@ export default function AppLayout() {
             {/* Always on top */}
             <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
                 <header className="h-">
-                    <TitleBar />
+                    <TitleBar activeFileId={activeFileId ?? ""} openFiles={getFileNodes()} closeFile={closeFile} />
                 </header>
 
                 {/* Page content starts under the titlebar */}

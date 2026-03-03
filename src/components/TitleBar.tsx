@@ -2,8 +2,9 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import minimizeIcon from '../assets/minimize.svg';
 import maximizeIcon from '../assets/maximize.svg';
 import closeIcon from '../assets/close.svg';
+import { FsNode } from '../AppLayout';
 
-function TitleBar() {
+function TitleBar({activeFileId, openFiles, closeFile,}: {activeFileId: String; openFiles: FsNode[]; closeFile: (id: String) => void;}) {
     const appWindow = getCurrentWindow();
 
     const onMinimize = async () => {
@@ -44,10 +45,20 @@ function TitleBar() {
 
             {/* Tabs area */}
             <div className="tabs flex gap-2 overflow-hidden">
-                <button className="active-tab">new_summaries <img src={closeIcon} className='w-4 h-4' /></button>
-                <button className="group tab">new_summaries_2 <img src={closeIcon} className='w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity' /></button>
+                {
+                    openFiles && openFiles.map((file) => {
+                        if (file.id === activeFileId) {
+                            return (<button className="active-tab">{file.name}<img src={closeIcon} className='w-4 h-4' 
+                                onClick={() => closeFile(file.id)} /></button>)
+                        }
+                        else {
+                            return (<button className="group tab">{file.name}<img src={closeIcon} onClick={() => closeFile(file.id)} 
+                                className='w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity' /></button>)
+                        }
+                    })
+                }
                 <div className='outline outline-white/40 mt-4 mb-2.5'></div>
-                <button className="nodrag mt-2 mb-1">+</button>
+                <button className="nodrag mt-2 mb-1 hover:bg-background-secondary">+</button>
             </div>
 
             <div className='flex-1' data-tauri-drag-region></div>
