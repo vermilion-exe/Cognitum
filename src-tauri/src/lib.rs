@@ -3,6 +3,41 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+#[tauri::command]
+fn create_file(path: String, contents: String) -> Result<(), String> {
+    fs::write(&path, contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_directory(path: String) -> Result<(), String> {
+    fs::create_dir_all(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_file(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_file(path: String) -> Result<(), String> {
+    fs::remove_file(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_directory(path: String) -> Result<(), String> {
+    fs::remove_dir_all(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn rename(from: String, to: String) -> Result<(), String> {
+    fs::rename(&from, &to).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn move_node(from: String, to: String) -> Result<(), String> {
+    fs::rename(&from, &to).map_err(|e| e.to_string())
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct AppConfig {
@@ -130,6 +165,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            create_file,
+            create_directory,
+            read_file,
+            delete_file,
+            delete_directory,
+            rename,
+            move_node,
             load_config,
             save_vault_path,
             scan_dir

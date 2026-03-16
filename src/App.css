@@ -45,7 +45,7 @@ html, body, #root {
     --crepe-color-on-background: white;
 }
 
-.milkdown-code-block, .cm-editor {
+.milkdown-code-block, .cm-editor, .cm-gutters {
     background: #575958 !important;
 }
 
@@ -173,7 +173,10 @@ html, body, #root {
     .tree-row:hover {
         @apply bg-background-secondary/60;
     }
+    .active-tree-row {
+        @apply relative flex items-center gap-2 h-8 px-2 mx-1 rounded-md bg-background-secondary/60;
+    }
     .tree-label {
-        @apply truncate;
+        @apply truncate select-none;
     }
 }

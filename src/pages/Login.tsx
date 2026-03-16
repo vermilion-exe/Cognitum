@@ -1,5 +1,4 @@
-import { useState, useContext } from 'react';
-import { UserContext } from '../components/UserProvider';
+import { useState } from 'react';
 import { MainHeader } from '../components';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
