@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cognitum?currentSchema=cognitum_data&serverTimezone=UTC
+    username: postgres
+    password: alskdjfhg
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+    database: postgresql
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: kaizenhabittracker@gmail.com
+    password: bfhycprxqspjmcyb
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+application:
+  security:
+    jwt:
+      secret-key: x3xi/tprS7qGNi38On8yzF0fMuhHr7v82QFxhs4cJpA=
+      jwt-expiration: 86400000 # 24 hours
+      refresh-token-expiration: 604800000 # 7 days
+
+debug: true
+
+app:
+  summarizer:
+    client:
+      base-url: http://localhost:8000
