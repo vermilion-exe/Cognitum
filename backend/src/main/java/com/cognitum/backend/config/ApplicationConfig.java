@@ -24,7 +24,6 @@ public class ApplicationConfig {
 
     private final UserRepository repository;
     private final AISummarizerClient aiSummarizerClient;
-    private final AISummarizerAPI aiSummarizerAPI;
 
     @Bean
     public UserDetailsService userDetailsService() {
