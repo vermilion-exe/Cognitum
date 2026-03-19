@@ -1,0 +1,6 @@
+litserve~=0.2.17
+transformers~=4.46.3
+requests~=2.32.5
+torch~=2.8.0+cu128
+pytorch-lightning~=2.5.5
+datasets~=4.3.0
