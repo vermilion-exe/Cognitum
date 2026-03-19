@@ -6,10 +6,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
-@HttpExchange("/summarize")
+@HttpExchange
 public interface AISummaryWebClient {
 
-    @PostExchange
+    @PostExchange("/predict")
     ResponseSummary summarize(@RequestBody RequestSummary request);
 
 }

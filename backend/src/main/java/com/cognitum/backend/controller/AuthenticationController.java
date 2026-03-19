@@ -13,8 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/cognitum/auth")
 @RequiredArgsConstructor
+@RequestMapping("/api/cognitum/auth")
 public class AuthenticationController {
 
     private final AuthenticationService service;

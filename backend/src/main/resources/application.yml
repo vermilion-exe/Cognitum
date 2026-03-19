@@ -19,8 +19,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: kaizenhabittracker@gmail.com
-    password: bfhycprxqspjmcyb
+    username: placehoder@gmail.com
+    password: password
     protocol: smtp
     properties:
       mail:
@@ -35,8 +35,6 @@ application:
       secret-key: x3xi/tprS7qGNi38On8yzF0fMuhHr7v82QFxhs4cJpA=
       jwt-expiration: 86400000 # 24 hours
       refresh-token-expiration: 604800000 # 7 days
-
-debug: true
 
 app:
   summarizer:

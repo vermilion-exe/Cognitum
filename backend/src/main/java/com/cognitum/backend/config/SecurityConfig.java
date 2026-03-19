@@ -28,7 +28,7 @@ import static org.springframework.security.config.http.SessionCreationPolicy.STA
 public class SecurityConfig {
 
     private static final String[] WHITE_LIST_URL = {
-            "/api/v1/auth/**",
+            "/api/cognitum/auth/**",
             "/v2/api-docs",
             "/v3/api-docs",
             "/v3/api-docs/**",
@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(req ->
                         req.requestMatchers(WHITE_LIST_URL)
+                                .permitAll()
+                                .requestMatchers("/api/cognitum/summary/**")
                                 .permitAll()
                                 .anyRequest()
                                 .authenticated()
