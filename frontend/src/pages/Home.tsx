@@ -1,9 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { MainHeader } from "../components";
 import { invoke } from "@tauri-apps/api/core";
+import { useUser } from "../contexts/UserContext";
+import { useEffect } from "react";
 
 function Home() {
     const navigate = useNavigate();
+    const { user } = useUser();
+
+    useEffect(() => {
+        if (user) {
+            navigate('/mainPage');
+        }
+    }, [user]);
 
     function handleLogin() {
         navigate('/login');

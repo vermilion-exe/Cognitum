@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { MainHeader } from '../components';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
+import { RequestAuth } from '../types/RequestAuth';
+import { ResponseAuth } from '../types/ResponseAuth';
+import { useUser } from '../contexts/UserContext';
 
 function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const { setUser } = useUser();
     const navigate = useNavigate();
 
     function handleReturn() {
@@ -13,14 +17,25 @@ function Login() {
     }
 
     async function handleLogin() {
-        const cfg = await invoke<{ vaultPath?: string }>("load_config");
+        const payload: RequestAuth = { email, password };
+        await invoke<ResponseAuth>("request_register", payload)
+            .then(async (result) => {
+                setUser({ userId: result.user_id, email: result.email, username: result.username });
+                await invoke("save_token", { token: result.access_token, is_refresh_token: false });
+                await invoke("save_token", { token: result.refresh_token, is_refresh_token: true });
 
-        if (!cfg.vaultPath) {
-            navigate('/choosePath');
-        }
-        else {
-            navigate('/mainPage');
-        }
+                const cfg = await invoke<{ vaultPath?: string }>("load_config");
+
+                if (!cfg.vaultPath) {
+                    navigate('/choosePath');
+                }
+                else {
+                    navigate('/mainPage');
+                }
+            })
+            .catch((e) => {
+                console.error("Command failed: ", e);
+            });
     }
 
     return (

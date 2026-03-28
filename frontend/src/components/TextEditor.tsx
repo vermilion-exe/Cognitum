@@ -4,14 +4,14 @@ import { Crepe } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
 import { listenerCtx } from "@milkdown/plugin-listener";
-import { replaceAll } from "@milkdown/kit/utils";
+import { getMarkdown, replaceAll } from "@milkdown/kit/utils";
 import "katex/dist/katex.min.css";
 import { useActiveFile } from "../contexts/ActiveFileContext";
 import { invoke } from "@tauri-apps/api/core";
 
-const AUTOSAVE_DELAY_MS = 1000;
+const AUTOSAVE_DELAY_MS = 300;
 
-export default function TextEditor() {
+export default function TextEditor({ onMarkdownChange, }: { onMarkdownChange: (markdown: string) => void; }) {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const crepeRef = useRef<Crepe | null>(null);
     const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,6 +43,20 @@ export default function TextEditor() {
         [cancelAutosave]
     );
 
+    const flushAutosave = useCallback(async () => {
+        cancelAutosave();
+        const fileId = activeFileIdRef.current;
+        if (!fileId || !crepeRef.current) return;
+
+        try {
+            const content = crepeRef.current.editor.action(getMarkdown());
+            await invoke("create_file", { path: fileId, contents: content });
+        }
+        catch (e) {
+            console.error("Flush save failed: ", e);
+        }
+    }, [cancelAutosave]);
+
     useEffect(() => {
         if (!hostRef.current) return;
 
@@ -54,6 +68,7 @@ export default function TextEditor() {
         crepe.editor.config((ctx => {
             ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
                 scheduleAutosave(markdown);
+                onMarkdownChange(markdown);
             })
         }))
 
@@ -71,17 +86,18 @@ export default function TextEditor() {
     useEffect(() => {
         if (!activeFileId) return;
 
-        activeFileIdRef.current = activeFileId;
-        cancelAutosave();
+        flushAutosave().then(() => {
+            activeFileIdRef.current = activeFileId;
 
-        invoke("read_file", { path: activeFileId })
-            .then((content) => {
-                crepeRef.current?.editor.action(replaceAll(String(content)));
-            })
-            .catch((e) => {
-                console.error("Failed to read file: ", e);
-            })
-    }, [activeFileId, cancelAutosave]);
+            invoke("read_file", { path: activeFileId })
+                .then((content) => {
+                    crepeRef.current?.editor.action(replaceAll(String(content)));
+                })
+                .catch((e) => {
+                    console.error("Failed to read file: ", e);
+                })
+        })
+    }, [activeFileId, cancelAutosave, flushAutosave]);
 
     return <div className="h-full w-full min-h-0 nodrag overflow-x-hidden overflow-y-auto" ref={hostRef} />;
 }
