@@ -48,7 +48,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setEmail(requestRegister.getEmail());
         user.setPassword(passwordEncoder.encode(requestRegister.getPassword()));
         user.setUsername(requestRegister.getUsername());
-        user.setIsActive(false);
         Long confirmationCode = generateRandomConfirmationCode();
         user.setCode(confirmationCode);
         emailService.sendEmail(user.getEmail(), confirmationCode);
@@ -59,7 +58,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             var refreshToken = jwtService.generateRefreshToken(savedUser);
 
             saveUserToken(savedUser, jwtToken);
-            return ResponseEntity.ok(ResponseAuthentication.builder().accessToken(jwtToken).refreshToken(refreshToken).build());
+            return ResponseEntity.ok(ResponseAuthentication.builder()
+                    .accessToken(jwtToken)
+                    .refreshToken(refreshToken)
+                    .userId(savedUser.getId())
+                    .username(savedUser.getActualUsername())
+                    .email(savedUser.getEmail())
+                    .build());
         }
 
         return ResponseEntity.badRequest().body(new ResponseAuthentication());
@@ -76,7 +81,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             revokeAllUserTokens(user);
             saveUserToken(user, jwtToken);
-            return ResponseEntity.ok(ResponseAuthentication.builder().accessToken(jwtToken).refreshToken(refreshToken).build());
+            return ResponseEntity.ok(ResponseAuthentication.builder()
+                    .accessToken(jwtToken)
+                    .refreshToken(refreshToken)
+                    .userId(user.getId())
+                    .username(user.getActualUsername())
+                    .email(user.getEmail())
+                    .build());
         }
 
         return ResponseEntity.badRequest().body(new ResponseAuthentication());

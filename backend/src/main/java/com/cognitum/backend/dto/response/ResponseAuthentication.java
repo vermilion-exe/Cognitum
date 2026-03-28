@@ -16,9 +16,9 @@ public class ResponseAuthentication {
     private String accessToken;
     @JsonProperty("refresh_token")
     private String refreshToken;
-    @JsonProperty("structure_id")
-    private Long structureId;
     @JsonProperty("user_id")
     private UUID userId;
+    private String username;
+    private String email;
 
 }

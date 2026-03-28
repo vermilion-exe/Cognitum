@@ -11,8 +11,8 @@ import lombok.Setter;
 @Setter
 public class RequestRegister {
 
-    String username;
-    String email;
-    String password;
+    private String username;
+    private String email;
+    private String password;
 
 }
