@@ -4,7 +4,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/cognitum?currentSchema=cognitum_data&serverTimezone=UTC
     username: postgres
-    password: alskdjfhg
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -19,8 +19,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: placehoder@gmail.com
-    password: password
+    username: cognitumapp@gmail.com
+    password: ${MAIL_PASSWORD}
     protocol: smtp
     properties:
       mail:
@@ -34,9 +34,15 @@ application:
     jwt:
       secret-key: x3xi/tprS7qGNi38On8yzF0fMuhHr7v82QFxhs4cJpA=
       jwt-expiration: 86400000 # 24 hours
-      refresh-token-expiration: 604800000 # 7 days
+      refresh-token-expiration: 2419200000 # 1 month
 
 app:
   summarizer:
     client:
       base-url: http://localhost:8000
+
+logging:
+  level:
+    org:
+      springframework:
+        security: DEBUG
