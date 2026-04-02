@@ -16,6 +16,7 @@
     "@milkdown/plugin-cursor": "^7.18.0",
     "@milkdown/plugin-history": "^7.18.0",
     "@milkdown/preset-commonmark": "^7.18.0",
+    "@milkdown/prose": "^7.20.0",
     "@milkdown/react": "^7.18.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.6.0",

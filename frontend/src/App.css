@@ -179,4 +179,14 @@ html, body, #root {
     .tree-label {
         @apply truncate select-none;
     }
+    .highlight-explanation {
+        background-color: rgba(250, 204, 21, 0.3);
+        border-bottom: 2px solid rgb(250, 204, 21);
+        border-radius: 2px;
+        cursor: pointer;
+        transition: background-color 150ms ease;
+    }
+    .highlight-explanation:hover {
+        background-color: rgba(250, 204, 21, 0.5);
+    }
 }

@@ -2,7 +2,7 @@ mod commands;
 mod entities;
 mod utils;
 
-use commands::{auth, config, file_system, summarizer};
+use commands::{auth, config, explanation, file_system, summarizer};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -28,7 +28,11 @@ pub fn run() {
             config::load_config,
             config::save_vault_path,
             file_system::scan_dir,
-            summarizer::request_summary
+            summarizer::request_summary,
+            explanation::request_explanation,
+            explanation::save_highlights,
+            explanation::read_highlights,
+            explanation::remove_highlight
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
