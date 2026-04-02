@@ -17,13 +17,11 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class SummaryServiceImpl implements SummaryService {
 
-    private final AISummaryWebClient aiSummaryWebClient;
-    private final TokenRepository tokenRepository;
-    private final UserRepository userRepository;
+    private final AISummaryWebClient webClient;
 
     @Override
     public ResponseSummary summarize(RequestSummary requestSummary) {
-        return aiSummaryWebClient.summarize(requestSummary);
+        return webClient.summarize(requestSummary);
     }
 
 }

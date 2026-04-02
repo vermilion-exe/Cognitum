@@ -1,7 +1,9 @@
 package com.cognitum.backend.config;
 
 import com.cognitum.backend.properties.AISummarizerClient;
+import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.UserRepository;
+import com.cognitum.backend.web.AIExplanationWebClient;
 import com.cognitum.backend.web.AISummaryWebClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +29,7 @@ public class ApplicationConfig {
 
     private final UserRepository repository;
     private final AISummarizerClient aiSummarizerClient;
+    private final NvidiaProperties nvidiaProperties;
 
     @Bean
     public UserDetailsService userDetailsService() {
@@ -65,6 +68,25 @@ public class ApplicationConfig {
                 .builderFor(RestClientAdapter.create(client))
                 .build()
                 .createClient(AISummaryWebClient.class);
+    }
+
+    @Bean
+    AIExplanationWebClient aiExplanationWebClient(RestClient.Builder builder) {
+        HttpClient httpClient = HttpClient.newBuilder().build();
+
+        JdkClientHttpRequestFactory requestFactory =
+                new JdkClientHttpRequestFactory(httpClient);
+        RestClient client = builder
+                .baseUrl(nvidiaProperties.getUrl())
+                .defaultHeader("Authorization", "Bearer "+nvidiaProperties.getKey())
+                .defaultHeader("Content-Type", "application/json")
+                .requestFactory(requestFactory)
+                .build();
+
+        return HttpServiceProxyFactory
+                .builderFor(RestClientAdapter.create(client))
+                .build()
+                .createClient(AIExplanationWebClient.class);
     }
 
 }
