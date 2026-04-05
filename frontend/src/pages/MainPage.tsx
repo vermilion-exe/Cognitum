@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { SummaryAccordion, TextEditor } from "../components";
+import { ExplanationAccordion, SummaryAccordion, TextEditor } from "../components";
 import { invoke } from "@tauri-apps/api/core";
 import { RequestSummary } from "../types/RequestSummary";
 import { ResponseSummary } from "../types/ResponseSummary";
@@ -15,6 +15,7 @@ function MainPage() {
     const [activeHighlight, setActiveHighlight] = useState<ResponseHighlight | undefined>();
     const [isSummaryOpen, setIsSummaryOpen] = useState(false);
     const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+    const [isExplanationLoading, setIsExplanationLoading] = useState(false);
     const [displayedText, setDisplayedText] = useState("");
     const [fullText, setFullText] = useState("");
     const editorRef = useRef<TextEditorHandle>(null);
@@ -84,6 +85,7 @@ function MainPage() {
     }
 
     const handleExplanation = async (text: string, from: number, to: number) => {
+        setIsExplanationLoading(true);
         const explanation: ResponseExplanation = await invoke<ResponseExplanation>("request_explanation", { text });
 
         const entry: ResponseHighlight = {
@@ -100,6 +102,7 @@ function MainPage() {
             editorRef.current?.pushHighlights(next);
             return next;
         });
+        setIsExplanationLoading(false);
     }
 
     const handleDelete = (id: string) => {
@@ -147,23 +150,19 @@ function MainPage() {
                     onMarkdownChange={(md) => { markdownRef.current = md }}
                     ref={editorRef}
                     initialHighlights={highlights}
+                    isExplanationLoading={isExplanationLoading}
                     onExplainText={handleExplanation}
                     onFileLoad={onFileLoad}
                     onHighlightsChange={setHighlights}
                     onHighlightClick={setActiveHighlightId} />
             </div>
 
-            {activeHighlightId && (
-                <aside className="w-80 overflow-y-auto border border-background-primary bg-background-secondary p-4">
-                    <p className="mb-2 text-xs italic text-gray-400">"{activeHighlight?.selected_text}"</p>
-                    <p className="mb-4 text-sm leading-relaxed">{activeHighlight?.explanation}</p>
-                    <div className="flex gap-2">
-                        <button className="rounded bg-button-primary px-3 py-1 text-sm hover:bg-button-primary/50" onClick={() => handleRegenerate(activeHighlightId)}>Regenerate</button>
-                        <button className="rounded bg-red-600 px-3 py-1 text-sm hover:bg-red-700" onClick={() => handleDelete(activeHighlightId)}>Delete</button>
-                        <button className="rounded bg-button-secondary px-3 py-1 text-sm hover:bg-button-secondary/50" onClick={() => setActiveHighlightId(null)}>Close</button>
-                    </div>
-                </aside>
-            )}
+            {activeHighlight && activeHighlightId && 
+                (<ExplanationAccordion 
+                    activeHighlight={activeHighlight} 
+                    setActiveHighlightId={setActiveHighlightId} 
+                    onRegenerate={handleRegenerate} 
+                    onDelete={handleDelete} />)}
         </div>
     );
 }

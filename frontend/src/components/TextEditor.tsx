@@ -11,7 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { selectionTooltipPlugin } from "../plugins/selectionTooltipPlugin";
 import { ResponseHighlight } from "../types/ResponseHighlight";
 import { editorViewCtx } from "@milkdown/core";
-import { createHighlightPlugin, highlightPluginKey } from "../plugins/highlightPlugin";
+import { createHighlightPlugin, highlightPluginKey, setHighlightsMeta, setLoadingMeta } from "../plugins/highlightPlugin";
 
 const AUTOSAVE_DELAY_MS = 300;
 
@@ -26,27 +26,36 @@ interface TextEditorProps {
     onHighlightsChange: (highlights: ResponseHighlight[]) => void;
     onHighlightClick: (id: string) => void;
     initialHighlights: ResponseHighlight[];
+    isExplanationLoading: boolean;
 }
 
-const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick, initialHighlights }, ref) => {
+const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick, initialHighlights, isExplanationLoading }, ref) => {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const crepeRef = useRef<Crepe | null>(null);
     const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const activeFileIdRef = useRef<string | null>(null);
     const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
+    const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
 
     const cbRef = useRef({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick });
     useEffect(() => { cbRef.current = { onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick } });
 
     useEffect(() => { highlightsRef.current = initialHighlights; }, [initialHighlights]);
+    useEffect(() => { explanationLoadingRef.current = isExplanationLoading; }, [isExplanationLoading]);
+
+    useEffect(() => {
+        const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
+        if (!view || view.isDestroyed) return;
+
+        view.dispatch(view.state.tr.setMeta(setLoadingMeta, isExplanationLoading));
+    }, [isExplanationLoading]);
 
     useImperativeHandle(ref, () => ({
         pushHighlights: (highlights: ResponseHighlight[]) => {
             crepeRef.current?.editor.action((ctx) => {
                 const view = ctx.get(editorViewCtx);
                 if (view.isDestroyed) return;
-                const tr = view.state.tr.setMeta(highlightPluginKey, highlights);
-                view.dispatch(tr);
+                view.dispatch(view.state.tr.setMeta(setHighlightsMeta, highlights));
             });
         },
     }));

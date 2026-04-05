@@ -10,7 +10,15 @@ interface HighlightPluginOptions {
     onHighlightClick: (id: string) => void;
 }
 
-export const highlightPluginKey = new PluginKey("highlight-explanation");
+interface PluginState {
+    highlights: ResponseHighlight[];
+    loadingAnchor: number | null;
+}
+
+export const highlightPluginKey = new PluginKey<PluginState>("highlight-explanation");
+
+export const setHighlightsMeta = "highlight/setHighlights";
+export const setLoadingMeta = "highlight/setLoading";
 
 function findText(doc: Node, text: string): { from: number; to: number } | null {
     let found: { from: number; to: number } | null = null;
@@ -45,7 +53,20 @@ function buildDecorations(doc: Node, highlights: ResponseHighlight[]): Decoratio
     return DecorationSet.create(doc, decorations);
 }
 
-export function createHighlightPlugin(options: HighlightPluginOptions): Plugin {
+function createLoadingWidget(view: EditorView): Decoration {
+    const pos = view.state.selection.to;
+
+    const toDOM = () => {
+        const span = document.createElement("span");
+        span.className = "animate-spin inline-block";
+        span.textContent = "⏳";
+        return span;
+    }
+
+    return Decoration.widget(pos, toDOM, {side: 1, key: "loading-spinner"});
+}
+
+export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<PluginState> {
     const { getHighlights, onHighlightsChange, onHighlightClick } = options;
 
     // Popover element shared across the plugin view
@@ -56,34 +77,84 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin {
 
         // Store the validated highlights in plugin state
         state: {
-            init: (_, state) => validateAndRestore(state.doc, getHighlights()),
-            apply: (tr, highlights: ResponseHighlight[]) => {
-                // Accept externally pushed highlight updates via meta
-                const next = tr.getMeta(highlightPluginKey);
-                if (next) return validateAndRestore(tr.doc, next);
+            init: (_, state): PluginState => ({
+                highlights: validateAndRestore(state.doc, getHighlights()),
+                loadingAnchor: null,
+            }),
+            apply: (tr, pluginState): PluginState => {
+                let {highlights, loadingAnchor}: PluginState = pluginState;
 
-                if (!tr.docChanged) return highlights;
+                const nextHighlights = tr.getMeta(setHighlightsMeta);
+                if (nextHighlights !== undefined) {
+                    highlights = validateAndRestore(tr.doc, nextHighlights);
+                }
 
-                // Map positions through the transaction, drop invalidated ranges
-                const mapped = highlights.flatMap((h) => {
-                    const from = tr.mapping.map(h.from, 1);
-                    const to = tr.mapping.map(h.to, -1);
-                    if (from >= to || to > tr.doc.content.size) return [];
-                    if (tr.doc.textBetween(from, to) !== h.selected_text) return [];
-                    return [{ ...h, from, to }];
-                });
+                const loadingChanged = tr.getMeta(setLoadingMeta);
+                if (loadingChanged) {
+                    loadingAnchor = tr.selection.to;
+                }
+                else {
+                    loadingAnchor = null;
+                }
 
-                // Notify React if any highlights were dropped
-                if (mapped.length < highlights.length)
-                    queueMicrotask(() => onHighlightsChange(mapped));
+                if (tr.docChanged && loadingAnchor !== null) {
+                    loadingAnchor = tr.mapping.map(loadingAnchor, 1);
+                }
 
-                return mapped;
+                if (tr.docChanged && nextHighlights === undefined) {
+                    // Map positions through the transaction, drop invalidated ranges
+                    const mapped = highlights.flatMap((h) => {
+                        const from = tr.mapping.map(h.from, 1);
+                        const to = tr.mapping.map(h.to, -1);
+                        if (from >= to || to > tr.doc.content.size) return [];
+                        if (tr.doc.textBetween(from, to) !== h.selected_text) return [];
+                        return [{ ...h, from, to }];
+                    });
+
+                    // Notify React if any highlights were dropped
+                    if (mapped.length < highlights.length)
+                        queueMicrotask(() => onHighlightsChange(mapped));
+                    
+                    highlights = mapped;
+                }
+
+                return {highlights, loadingAnchor};
             },
         },
 
         props: {
-            decorations: (state) =>
-                buildDecorations(state.doc, highlightPluginKey.getState(state) ?? []),
+            decorations: (state) =>{
+                const {highlights, loadingAnchor} = highlightPluginKey.getState(state) ?? {highlights: [], loadingAnchor: null};
+                const decorations = highlights
+                    .filter((h: ResponseHighlight) => h.from < h.to && h.to <= state.doc.content.size)
+                    .map((h: ResponseHighlight) =>
+                        Decoration.inline(h.from, h.to, {
+                            class: "highlight-explanation",
+                            "data-highlight-id": h.id,
+                        })
+                    );
+
+                if (loadingAnchor !== null) {
+                    const anchor = Math.min(
+                        loadingAnchor,
+                        state.doc.content.size
+                    );
+                    decorations.push(
+                        Decoration.widget(
+                            anchor,
+                            () => {
+                                const span = document.createElement("span");
+                                span.className = "animate-spin inline-block";
+                                span.textContent = "⏳";
+                                return span;
+                            },
+                            { side: 1, key: "loading-spinner" }
+                        )
+                    );
+                }
+
+                return DecorationSet.create(state.doc, decorations);
+            },
 
             handleDOMEvents: {
                 mouseover: (view, e) => {
@@ -92,7 +163,8 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin {
                         ?.dataset.highlightId;
                     if (!id || !popover) return false;
 
-                    const h = (highlightPluginKey.getState(view.state) as ResponseHighlight[]).find(
+                    const {highlights} = highlightPluginKey.getState(view.state) as PluginState;
+                    const h = highlights.find(
                         (h) => h.id === id
                     );
                     if (!h) return false;
