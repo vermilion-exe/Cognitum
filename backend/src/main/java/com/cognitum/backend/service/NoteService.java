@@ -8,6 +8,7 @@ import java.util.List;
 public interface NoteService {
 
     List<ResponseNote> getNotes(String token);
-    void createNote(String token, RequestNote requestNote);
+    ResponseNote createNote(String token, RequestNote requestNote);
+    ResponseNote getNoteByPath(String token, String path);
 
 }

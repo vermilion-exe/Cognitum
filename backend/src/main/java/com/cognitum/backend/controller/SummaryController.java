@@ -19,4 +19,16 @@ public class SummaryController {
         return summaryService.summarize(requestSummary);
     }
 
+    @GetMapping("/note")
+    public ResponseSummary getSummaryByNoteId(@RequestHeader("Authorization") String token,
+                                            @RequestParam Long noteId) {
+        return summaryService.getSummaryByNoteId(token, noteId);
+    }
+
+    @PostMapping
+    public void createSummary(@RequestHeader("Authorization") String token,
+                             @RequestBody ResponseSummary request) {
+        summaryService.createSummary(token, request);
+    }
+
 }

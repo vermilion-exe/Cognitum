@@ -20,14 +20,14 @@ public class NoteController {
         return noteService.getNotes(token);
     }
 
-    @GetMapping("path")
+    @GetMapping("/path")
     public ResponseNote getNoteByPath(@RequestHeader("Authorization") String token, @RequestParam String path) {
         return noteService.getNoteByPath(token, path);
     }
 
     @PostMapping
-    public void createNote(String token, RequestNote request) {
-        noteService.createNote(token, request);
+    public ResponseNote createNote(String token, RequestNote request) {
+        return noteService.createNote(token, request);
     }
 
 }

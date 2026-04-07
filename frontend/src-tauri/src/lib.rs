@@ -34,6 +34,7 @@ pub fn run() {
             explanation::read_highlights,
             explanation::remove_highlight,
             note::get_notes,
+            note::get_note_by_path,
             note::create_note
         ])
         .run(tauri::generate_context!())

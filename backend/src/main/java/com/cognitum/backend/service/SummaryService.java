@@ -6,5 +6,7 @@ import com.cognitum.backend.dto.response.ResponseSummary;
 public interface SummaryService {
 
     ResponseSummary summarize(RequestSummary requestSummary);
+    ResponseSummary getSummaryByNoteId(String token, Long noteId);
+    void createSummary(String token, ResponseSummary request);
 
 }

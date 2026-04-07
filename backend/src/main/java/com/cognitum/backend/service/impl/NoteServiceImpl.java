@@ -30,7 +30,7 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
-    public void createNote(String token, RequestNote request) {
+    public ResponseNote createNote(String token, RequestNote request) {
         ResponseUser user = jwtService.getTokenInfo(token);
 
         Note note = new Note();
@@ -39,7 +39,18 @@ public class NoteServiceImpl implements NoteService {
         note.setPath(request.getPath());
         note.setUserId(user.getId());
 
-        noteRepository.save(note);
+        Note savedNote = noteRepository.save(note);
+
+        return new ResponseNote(savedNote.getId(), savedNote.getText(), savedNote.getPath());
+    }
+
+    @Override
+    public ResponseNote getNoteByPath(String token, String path) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+        Note note = noteRepository.findByUserIdAndPath(user.getId(), path)
+                .orElseThrow(() -> new RuntimeException("Note not found"));
+
+        return new ResponseNote(note.getId(), note.getText(), note.getPath());
     }
 
 }

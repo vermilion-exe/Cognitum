@@ -43,14 +43,17 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownCh
     const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
     const { scheduleSync } = useSyncManager();
     const { syncEnabled, setStatus } = useSyncStatus();
-    const [currentNote, setCurrentNote] = useState<RequestNote>();
+    const [currentNote, setCurrentNote] = useState<RequestNote | null>();
     const isCreatingNoteRef = useRef(false);
 
     useEffect(() => {
         if (!activeFileIdRef.current || !syncEnabled) return;
 
-        const relativePath
-    })
+        const relativePath = toRelativePath(activeFileIdRef.current);
+        invoke<RequestNote | null>("get_note_by_path", {request: relativePath})
+        .then((note) => setCurrentNote(note))
+        .catch(console.error);
+    }, [activeFileIdRef.current, syncEnabled]);
 
     const cbRef = useRef({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick });
     useEffect(() => { cbRef.current = { onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick } });
@@ -74,6 +77,12 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownCh
             });
         },
     }));
+
+    function toRelativePath(fullPath: string) {
+        const normalised = fullPath.replace(/\\/g, "/");
+        const base = appDataDirPath.replace(/\\/g, "/");
+        return normalised?.startsWith(base) ? normalised.slice(base.length).replace(/^\//, "") : fullPath;
+    }
 
     const { activeFileId } = useActiveFile();
 
@@ -127,18 +136,32 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownCh
             ctx.get(listenerCtx).markdownUpdated(async (_ctx, markdown) => {
                 scheduleAutosave(markdown);
                 cbRef.current.onMarkdownChange?.(markdown);
-                if (!syncEnabled) return;
-                const note = await invoke<RequestNote>("get_notes");
-                if (!note) {
-                    const normalised = activeFileIdRef.current?.replace(/\\/g, "/");
-                    const base = appDataDirPath.replace(/\\/g, "/");
-                    const path = normalised?.startsWith(base) ? normalised.slice(base.length).replace(/^\//, "") : activeFileIdRef.current;
 
-                    await invoke("create_note", { request: { text: markdown, path: path } });
-                    return;
+                if (!syncEnabled) return;
+
+                if (!currentNote && !isCreatingNoteRef.current) {
+                    isCreatingNoteRef.current = true;
+                    try {
+                        const path = toRelativePath(activeFileIdRef.current!);
+
+                        const createdNote = await invoke<RequestNote>("create_note", { request: { text: markdown, path: path } });
+                        setCurrentNote(createdNote);
+                    }
+                    catch (e) {
+                        console.error("Error creating note: ", e);
+                    }
+                    finally {
+                        isCreatingNoteRef.current = false;
+                    }
                 }
+
+                if (isCreatingNoteRef.current || !currentNote) return;
+
+                isCreatingNoteRef.current = true;
                 setStatus("pending");
-                scheduleSync(`note-${note.id}`, { type: "note", id: String(note.id), payload: { id: note.id, text: markdown, path: note.path } });
+                scheduleSync(`note-${currentNote.id}`, 
+                    { type: "note", id: String(currentNote.id), payload: { id: currentNote.id, text: markdown, path: currentNote.path } });
+                isCreatingNoteRef.current = false;
             })
         }))
             .use(
