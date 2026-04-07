@@ -11,7 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @Getter
 @Setter
-public class ResponseExplanation {
+public class ResponseCompletion {
 
     private List<ResponseChoice> choices;
 

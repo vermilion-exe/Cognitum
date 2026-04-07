@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @Getter
 @Setter
-public class RequestExplanation {
+public class RequestCompletion {
 
     private String model;
     private List<RequestMessage> messages;

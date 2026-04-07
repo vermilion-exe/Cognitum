@@ -1,15 +1,15 @@
 package com.cognitum.backend.web;
 
-import com.cognitum.backend.dto.request.RequestExplanation;
-import com.cognitum.backend.dto.response.ResponseExplanation;
+import com.cognitum.backend.dto.request.RequestCompletion;
+import com.cognitum.backend.dto.response.ResponseCompletion;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
 @HttpExchange
-public interface AIExplanationWebClient {
+public interface NvidiaWebClient {
 
     @PostExchange("/chat/completions")
-    ResponseExplanation requestExplanation(@RequestBody RequestExplanation request);
+    ResponseCompletion requestCompletion(@RequestBody RequestCompletion request);
 
 }

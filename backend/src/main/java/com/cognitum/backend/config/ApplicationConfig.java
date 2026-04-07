@@ -3,7 +3,7 @@ package com.cognitum.backend.config;
 import com.cognitum.backend.properties.AISummarizerClient;
 import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.UserRepository;
-import com.cognitum.backend.web.AIExplanationWebClient;
+import com.cognitum.backend.web.NvidiaWebClient;
 import com.cognitum.backend.web.AISummaryWebClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -71,7 +71,7 @@ public class ApplicationConfig {
     }
 
     @Bean
-    AIExplanationWebClient aiExplanationWebClient(RestClient.Builder builder) {
+    NvidiaWebClient nvidiaWebClient(RestClient.Builder builder) {
         HttpClient httpClient = HttpClient.newBuilder().build();
 
         JdkClientHttpRequestFactory requestFactory =
@@ -86,7 +86,7 @@ public class ApplicationConfig {
         return HttpServiceProxyFactory
                 .builderFor(RestClientAdapter.create(client))
                 .build()
-                .createClient(AIExplanationWebClient.class);
+                .createClient(NvidiaWebClient.class);
     }
 
 }
