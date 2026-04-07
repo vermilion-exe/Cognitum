@@ -1,6 +1,6 @@
 package com.cognitum.backend.controller;
 
-import com.cognitum.backend.dto.response.ResponseExplanation;
+import com.cognitum.backend.dto.response.ResponseCompletion;
 import com.cognitum.backend.service.ExplanationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +16,7 @@ public class ExplanationController {
     private final ExplanationService explanationService;
 
     @PostMapping("/explain")
-    ResponseExplanation requestExplanation(@RequestBody String text) {
+    ResponseCompletion requestExplanation(@RequestBody String text) {
         return explanationService.requestExplanation(text);
     }
 
