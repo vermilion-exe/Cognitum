@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileTreeProvider } from "./contexts/FileTreeContext";
 import { ActiveFileProvider } from "./contexts/ActiveFileContext";
 import { UserProvider } from "./contexts/UserContext";
+import { SyncProvider } from "./contexts/SyncContext";
 
 function AppLayoutInner() {
     const [explorerHidden, setExplorerHidden] = useState(false);
@@ -34,12 +35,14 @@ function AppLayoutInner() {
 
 export default function AppLayout() {
     return (
-        <UserProvider>
-            <ActiveFileProvider>
-                <FileTreeProvider>
-                    <AppLayoutInner />
-                </FileTreeProvider>
-            </ActiveFileProvider>
-        </UserProvider>
+        <SyncProvider>
+            <UserProvider>
+                <ActiveFileProvider>
+                    <FileTreeProvider>
+                        <AppLayoutInner />
+                    </FileTreeProvider>
+                </ActiveFileProvider>
+            </UserProvider>
+        </SyncProvider>
     );
 }

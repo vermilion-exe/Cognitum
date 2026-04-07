@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Crepe } from "@milkdown/crepe";
 
 import "@milkdown/crepe/theme/common/style.css";
@@ -12,8 +12,13 @@ import { selectionTooltipPlugin } from "../plugins/selectionTooltipPlugin";
 import { ResponseHighlight } from "../types/ResponseHighlight";
 import { editorViewCtx } from "@milkdown/core";
 import { createHighlightPlugin, highlightPluginKey, setHighlightsMeta, setLoadingMeta } from "../plugins/highlightPlugin";
+import { useSyncManager } from "../hooks/useSyncManager";
+import { useSyncStatus } from "../contexts/SyncContext";
+import { RequestNote } from "../types/RequestNote";
+import { appDataDir } from "@tauri-apps/api/path";
 
 const AUTOSAVE_DELAY_MS = 300;
+const appDataDirPath = await appDataDir();
 
 export interface TextEditorHandle {
     pushHighlights: (highlights: ResponseHighlight[]) => void;
@@ -36,6 +41,16 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownCh
     const activeFileIdRef = useRef<string | null>(null);
     const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
     const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
+    const { scheduleSync } = useSyncManager();
+    const { syncEnabled, setStatus } = useSyncStatus();
+    const [currentNote, setCurrentNote] = useState<RequestNote>();
+    const isCreatingNoteRef = useRef(false);
+
+    useEffect(() => {
+        if (!activeFileIdRef.current || !syncEnabled) return;
+
+        const relativePath
+    })
 
     const cbRef = useRef({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick });
     useEffect(() => { cbRef.current = { onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick } });
@@ -109,9 +124,21 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownCh
         });
 
         crepe.editor.config((ctx => {
-            ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+            ctx.get(listenerCtx).markdownUpdated(async (_ctx, markdown) => {
                 scheduleAutosave(markdown);
                 cbRef.current.onMarkdownChange?.(markdown);
+                if (!syncEnabled) return;
+                const note = await invoke<RequestNote>("get_notes");
+                if (!note) {
+                    const normalised = activeFileIdRef.current?.replace(/\\/g, "/");
+                    const base = appDataDirPath.replace(/\\/g, "/");
+                    const path = normalised?.startsWith(base) ? normalised.slice(base.length).replace(/^\//, "") : activeFileIdRef.current;
+
+                    await invoke("create_note", { request: { text: markdown, path: path } });
+                    return;
+                }
+                setStatus("pending");
+                scheduleSync(`note-${note.id}`, { type: "note", id: String(note.id), payload: { id: note.id, text: markdown, path: note.path } });
             })
         }))
             .use(
