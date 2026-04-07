@@ -9,6 +9,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -42,11 +43,11 @@ public class User implements UserDetails {
     @Column(name = "profile_picture_url")
     private String profilePictureUrl;
 
-    @Column
+    @Column(name = "is_active")
     private Boolean isActive;
 
-    @Column
-    private Date dateCreated;
+    @Column(name = "date_created")
+    private LocalDateTime dateCreated;
 
     @OneToMany(mappedBy = "user")
     private List<Token> tokens;
@@ -85,12 +86,12 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return isActive;
     }
 
     @PrePersist
     public void onCreate() {
-        dateCreated = new Date();
+        dateCreated = LocalDateTime.now();
         isActive = false;
     }
 
