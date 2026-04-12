@@ -40,8 +40,8 @@ public class AuthenticationController {
 
     @SneakyThrows
     @PostMapping("/refresh-token")
-    public void refreshToken(@RequestBody RequestRefreshToken body) {
-        service.refreshToken(body.getRequest(), body.getResponse());
+    public ResponseEntity<ResponseAuthentication> refreshToken(@RequestBody RequestRefreshToken body) {
+        return service.refreshToken(body.getRequest(), body.getResponse());
     }
 
     @PostMapping("/confirm")
