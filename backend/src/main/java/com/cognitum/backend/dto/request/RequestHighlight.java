@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -18,7 +18,7 @@ public class RequestHighlight {
     private String selectedText;
     private Integer from;
     private Integer to;
-    private Date createdAt;
+    private LocalDateTime createdAt;
     private Long noteId;
 
 }

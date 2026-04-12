@@ -22,10 +22,10 @@ public class Explanation {
     @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
-    @Column
+    @Column(name = "from_pos")
     private Integer from;
 
-    @Column
+    @Column(name = "to_pos")
     private Integer to;
 
     @Column(name = "selected_text")

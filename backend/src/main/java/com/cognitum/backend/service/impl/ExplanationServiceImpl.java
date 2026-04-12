@@ -4,6 +4,7 @@ import com.cognitum.backend.dto.request.RequestCompletion;
 import com.cognitum.backend.dto.request.RequestHighlight;
 import com.cognitum.backend.dto.request.RequestMessage;
 import com.cognitum.backend.dto.response.ResponseCompletion;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.entity.Explanation;
 import com.cognitum.backend.entity.Note;
@@ -44,7 +45,7 @@ public class ExplanationServiceImpl implements ExplanationService {
     }
 
     @Override
-    public void createExplanation(String token, RequestHighlight request) {
+    public ResponseOperation createExplanation(String token, RequestHighlight request) {
         ResponseUser user = jwtService.getTokenInfo(token);
         Note note = noteRepository.findById(request.getNoteId())
                 .orElseThrow(() -> new RuntimeException("Note not found with id: " + request.getNoteId()));
@@ -62,6 +63,8 @@ public class ExplanationServiceImpl implements ExplanationService {
         explanation.setNote(note);
 
         explanationRepository.save(explanation);
+
+        return new ResponseOperation(true);
     }
 
     @Override
@@ -83,6 +86,28 @@ public class ExplanationServiceImpl implements ExplanationService {
         requestHighlight.setNoteId(explanation.getNote().getId());
 
         return requestHighlight;
+    }
+
+    @Override
+    public List<RequestHighlight> getExplanationsByNoteId(String token, Long noteId) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+
+        ResponseUser user = jwtService.getTokenInfo(token);
+        if(!note.getUserId().equals(user.getId()) ) {
+            throw new RuntimeException("Unauthorized to access explanations for note with id: " + noteId);
+        }
+
+        return note.getExplanations().stream().map(explanation -> {
+            RequestHighlight requestHighlight = new RequestHighlight();
+            requestHighlight.setId(explanation.getId());
+            requestHighlight.setSelectedText(explanation.getSelectedText());
+            requestHighlight.setFrom(explanation.getFrom());
+            requestHighlight.setTo(explanation.getTo());
+            requestHighlight.setCreatedAt(explanation.getCreatedAt());
+            requestHighlight.setNoteId(explanation.getNote().getId());
+            return requestHighlight;
+        }).toList();
     }
 
 }
