@@ -2,11 +2,28 @@ mod commands;
 mod entities;
 mod utils;
 
-use commands::{auth, config, explanation, file_system, note, summarizer};
+use commands::{auth, config, explanation, file_system, note, question, summarizer};
+use reqwest::Client;
+use tauri::Manager;
+
+pub struct AppState {
+    pub client: Client,
+    pub base_url: String,
+    pub app_handle: tauri::AppHandle,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let handle = app.handle().clone();
+            app.manage(AppState {
+                client: reqwest::Client::new(),
+                base_url: "http://localhost:8080/api/cognitum".to_string(),
+                app_handle: handle,
+            });
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -29,13 +46,46 @@ pub fn run() {
             config::save_vault_path,
             file_system::scan_dir,
             summarizer::request_summary,
+            summarizer::get_summary_by_note_id,
+            summarizer::create_summary,
+            summarizer::save_summary,
+            summarizer::get_local_summary,
             explanation::request_explanation,
             explanation::save_highlights,
             explanation::read_highlights,
             explanation::remove_highlight,
-            note::get_notes,
+            explanation::get_explanations_by_note_id,
+            explanation::create_explanation,
+            explanation::remove_local_highlights,
+            note::get_all_notes,
+            note::save_note_metadata,
+            note::get_local_note,
+            note::get_local_notes,
+            note::get_notes_since, // New command for polling
             note::get_note_by_path,
-            note::create_note
+            note::create_note,
+            explanation::get_highlights_since, // New command for polling
+            summarizer::get_summaries_since,   // New command for polling
+            question::generate_flashcards,
+            question::check_flashcard_relevance,
+            question::get_due_cards,
+            question::update_stale_flashcards,
+            question::submit_review,
+            question::get_flashcards_by_note_id,
+            question::delete_stale_flashcards,
+            question::delete_all_flashcards_by_note_id,
+            question::delete_flashcard,
+            question::save_local_flashcards,
+            question::load_local_flashcards,
+            question::save_review_queue,
+            question::load_review_queue,
+            config::save_sync_timestamp, // New command for saving sync timestamp
+            config::load_sync_timestamp, // New command for loading sync timestamp
+            config::save_sync_progress,
+            config::load_sync_progress,
+            config::clear_sync_progress,
+            config::save_sync_queue,
+            config::load_sync_queue
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

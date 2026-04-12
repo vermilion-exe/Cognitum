@@ -1,10 +1,15 @@
+pub mod card_review;
 pub mod request_auth;
 pub mod request_note;
 pub mod request_register;
 pub mod request_summary;
+pub mod request_sync_progress;
 pub mod response_auth;
 pub mod response_choice;
 pub mod response_explanation;
+pub mod response_flashcard;
 pub mod response_highlight;
 pub mod response_message;
+pub mod response_operation;
 pub mod response_summary;
+pub mod sync_operation;

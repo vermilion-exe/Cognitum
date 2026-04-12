@@ -1,8 +1,14 @@
+use chrono::DateTime;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri::Manager;
+
+use crate::entities::request_sync_progress::RequestSyncProgress;
+use crate::entities::sync_operation::SyncOperation;
 
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -98,6 +104,17 @@ pub fn save_token(token: String, is_refresh_token: bool) -> Result<(), String> {
     entry.set_password(&token).map_err(|e| e.to_string())
 }
 
+pub fn save_token_internal(token: &str, is_refresh_token: bool) -> Result<(), String> {
+    let token_type = if is_refresh_token {
+        "refresh_token"
+    } else {
+        "access_token"
+    };
+    let entry = keyring::Entry::new("cognitum", token_type).map_err(|e| e.to_string())?;
+
+    entry.set_password(&token).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn load_token(is_refresh_token: bool) -> Result<String, String> {
     let token_type = if is_refresh_token {
@@ -120,4 +137,106 @@ pub fn clear_token(is_refresh_token: bool) -> Result<(), String> {
     let entry = keyring::Entry::new("cognitum", token_type).map_err(|e| e.to_string())?;
 
     entry.delete_password().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_sync_timestamp(app: AppHandle, timestamp: DateTime<Utc>) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_timestamp.json");
+
+    let json = serde_json::to_string(&timestamp).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn load_sync_timestamp(app: AppHandle) -> Result<DateTime<Utc>, String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_timestamp.json");
+
+    if !path.exists() {
+        return Err("No sync timestamp".to_string());
+    }
+
+    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_sync_progress(app: AppHandle, progress: RequestSyncProgress) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_progress.json");
+
+    let json = serde_json::to_string(&progress).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn load_sync_progress(app: AppHandle) -> Result<RequestSyncProgress, String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_progress.json");
+
+    if !path.exists() {
+        return Err("No sync progress found.".to_string());
+    }
+
+    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn clear_sync_progress(app: AppHandle) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_progress.json");
+
+    fs::remove_file(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_sync_queue(
+    app: AppHandle,
+    queue: HashMap<String, SyncOperation>,
+) -> Result<(), String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_queue.json");
+
+    let json = serde_json::to_string(&queue).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn load_sync_queue(app: AppHandle) -> Result<Option<HashMap<String, SyncOperation>>, String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_queue.json");
+
+    if !path.exists() {
+        return Err("No sync progress found.".to_string());
+    }
+
+    let json = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    if json.trim().is_empty() {
+        return Ok(None);
+    }
+    let queue = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+    Ok(Some(queue))
 }
