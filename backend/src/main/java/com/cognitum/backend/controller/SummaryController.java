@@ -1,6 +1,7 @@
 package com.cognitum.backend.controller;
 
 import com.cognitum.backend.dto.request.RequestSummary;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseSummary;
 import com.cognitum.backend.service.SummaryService;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +27,9 @@ public class SummaryController {
     }
 
     @PostMapping
-    public void createSummary(@RequestHeader("Authorization") String token,
-                             @RequestBody ResponseSummary request) {
-        summaryService.createSummary(token, request);
+    public ResponseOperation createSummary(@RequestHeader("Authorization") String token,
+                                           @RequestBody ResponseSummary request) {
+        return summaryService.createSummary(token, request);
     }
 
 }

@@ -1,6 +1,7 @@
 package com.cognitum.backend.service.impl;
 
 import com.cognitum.backend.dto.request.RequestSummary;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseSummary;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.entity.Summary;
@@ -45,7 +46,7 @@ public class SummaryServiceImpl implements SummaryService {
     }
 
     @Override
-    public void createSummary(String token, ResponseSummary request) {
+    public ResponseOperation createSummary(String token, ResponseSummary request) {
         ResponseUser user = jwtService.getTokenInfo(token);
 
         summaryRepository.getSummaryByNoteId(request.getNoteId())
@@ -61,6 +62,8 @@ public class SummaryServiceImpl implements SummaryService {
                 .orElseThrow(() -> new RuntimeException("Note not found")));
 
         summaryRepository.save(summary);
+
+        return new ResponseOperation(true);
     }
 
 }
