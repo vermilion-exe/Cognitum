@@ -115,12 +115,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @SneakyThrows
     @Override
-    public void refreshToken(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<ResponseAuthentication> refreshToken(HttpServletRequest request, HttpServletResponse response) {
         final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         final String refreshToken;
         final String userEmail;
         if(authHeader == null || !authHeader.startsWith("Bearer ")){
-            return;
+            return ResponseEntity.badRequest().body(new ResponseAuthentication());
         }
         refreshToken = authHeader.substring(7);
         userEmail = jwtService.extractUsername(refreshToken);
@@ -133,8 +133,18 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 revokeAllUserTokens(user);
                 saveUserToken(user, jwtToken);
                 response.setHeader(HttpHeaders.AUTHORIZATION, jwtToken);
+
+                return ResponseEntity.ok(ResponseAuthentication.builder()
+                        .accessToken(jwtToken)
+                        .refreshToken(refreshToken)
+                        .userId(user.getId())
+                        .username(user.getActualUsername())
+                        .email(user.getEmail())
+                        .build());
             }
         }
+
+        return ResponseEntity.badRequest().body(new ResponseAuthentication());
     }
 
     @Override

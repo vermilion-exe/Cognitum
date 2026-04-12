@@ -2,6 +2,7 @@ package com.cognitum.backend.service.impl;
 
 import com.cognitum.backend.dto.response.ResponseSM2;
 import com.cognitum.backend.entity.CardReview;
+import com.cognitum.backend.entity.Flashcard;
 import com.cognitum.backend.service.SM2Service;
 import org.springframework.stereotype.Service;
 
@@ -11,10 +12,10 @@ import java.time.LocalDate;
 public class SM2ServiceImpl implements SM2Service {
 
     @Override
-    public ResponseSM2 calculate(CardReview review, int quality) {
-        double easiness = review.getEasinessFactor();
-        int interval = review.getInterval();
-        int repetitions = review.getRepetitions();
+    public ResponseSM2 calculate(Flashcard flashcard, int quality) {
+        double easiness = flashcard.getEasinessFactor();
+        int interval = flashcard.getInterval();
+        int repetitions = flashcard.getRepetitions();
 
         if (quality < 3) {
             return new ResponseSM2(

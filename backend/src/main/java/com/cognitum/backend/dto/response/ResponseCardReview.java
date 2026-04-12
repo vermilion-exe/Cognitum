@@ -1,7 +1,6 @@
 package com.cognitum.backend.dto.response;
 
 import com.cognitum.backend.enums.FlashcardType;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,23 +13,17 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Getter
 @Setter
-public class ResponseFlashcard {
+public class ResponseCardReview {
 
-    private Long id;
+    private Long reviewId;
+    private Long flashcardId;
     private String question;
     private String answer;
     private FlashcardType type;
-    @JsonProperty("is_retired")
-    private Boolean isRetired;
-    @JsonProperty("is_stale")
-    private Boolean isStale;
-    @JsonProperty("easiness_factor")
     private Double easinessFactor;
     private Integer interval;
     private Integer repetitions;
-    @JsonProperty("next_review")
     private LocalDate nextReview;
-    @JsonProperty("last_reviewed")
     private LocalDateTime lastReviewed;
 
 }

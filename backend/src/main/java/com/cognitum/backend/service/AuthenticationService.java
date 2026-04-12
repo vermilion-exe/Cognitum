@@ -14,7 +14,7 @@ public interface AuthenticationService {
     ResponseEntity<ResponseAuthentication> register(RequestRegister requestRegister);
     ResponseEntity<ResponseAuthentication> authenticate(RequestAuthentication requestAuthentication);
     void logout(String token);
-    void refreshToken(HttpServletRequest request, HttpServletResponse response);
+    ResponseEntity<ResponseAuthentication> refreshToken(HttpServletRequest request, HttpServletResponse response);
     void confirmUser(RequestConfirmation requestConfirmation);
 //    ResponseEntity<Boolean> emailSendCodeChangePassword(String email);
 //    ResponseEntity<Boolean> changePassword(RequestChangePassword changePassword);
