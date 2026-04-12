@@ -4,8 +4,10 @@ import com.cognitum.backend.dto.request.RequestNote;
 import com.cognitum.backend.dto.response.ResponseNote;
 import com.cognitum.backend.service.NoteService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -25,8 +27,13 @@ public class NoteController {
         return noteService.getNoteByPath(token, path);
     }
 
+    @GetMapping("/since")
+    public List<ResponseNote> getNotesSince(@RequestHeader("Authorization") String token, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime timestamp) {
+        return noteService.getNotesSince(token, timestamp);
+    }
+
     @PostMapping
-    public ResponseNote createNote(String token, RequestNote request) {
+    public ResponseNote createNote(@RequestHeader("Authorization") String token, @RequestBody RequestNote request) {
         return noteService.createNote(token, request);
     }
 

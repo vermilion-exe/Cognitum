@@ -10,6 +10,7 @@ import com.cognitum.backend.service.NoteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -25,7 +26,7 @@ public class NoteServiceImpl implements NoteService {
         List<Note> notes = noteRepository.findAllByUserId(user.getId());
 
         return notes.stream()
-                .map(note -> new ResponseNote(note.getId(), note.getText(), note.getPath()))
+                .map(note -> new ResponseNote(note.getId(), note.getText(), note.getPath(), note.getCreatedAt(), note.getLastUpdated()))
                 .toList();
     }
 
@@ -34,14 +35,29 @@ public class NoteServiceImpl implements NoteService {
         ResponseUser user = jwtService.getTokenInfo(token);
 
         Note note = new Note();
+
+        if (request.getId() != null) {
+            Note existingNote = noteRepository.findById(request.getId())
+                    .orElseThrow(() -> new RuntimeException("Note not found"));
+
+            if (!existingNote.getUserId().equals(user.getId())) {
+                throw new RuntimeException("Unauthorized");
+            }
+
+            note.setFlashcards(existingNote.getFlashcards());
+            note.setExplanations(existingNote.getExplanations());
+        }
+
         note.setId(request.getId());
         note.setText(request.getText());
         note.setPath(request.getPath());
         note.setUserId(user.getId());
+        note.setCreatedAt(request.getCreatedAt());
+        note.setLastUpdated(request.getLastUpdated());
 
         Note savedNote = noteRepository.save(note);
 
-        return new ResponseNote(savedNote.getId(), savedNote.getText(), savedNote.getPath());
+        return new ResponseNote(savedNote.getId(), savedNote.getText(), savedNote.getPath(), savedNote.getCreatedAt(), savedNote.getLastUpdated());
     }
 
     @Override
@@ -50,7 +66,17 @@ public class NoteServiceImpl implements NoteService {
         Note note = noteRepository.findByUserIdAndPath(user.getId(), path)
                 .orElseThrow(() -> new RuntimeException("Note not found"));
 
-        return new ResponseNote(note.getId(), note.getText(), note.getPath());
+        return new ResponseNote(note.getId(), note.getText(), note.getPath(), note.getCreatedAt(), note.getLastUpdated());
+    }
+
+    @Override
+    public List<ResponseNote> getNotesSince(String token, LocalDateTime timestamp) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+        List<Note> notes = noteRepository.findAllByUserIdAndLastUpdatedAfter(user.getId(), timestamp);
+
+        return notes.stream()
+                .map(note -> new ResponseNote(note.getId(), note.getText(), note.getPath(), note.getCreatedAt(), note.getLastUpdated()))
+                .toList();
     }
 
 }
