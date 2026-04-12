@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import { Crepe } from "@milkdown/crepe";
 
 import "@milkdown/crepe/theme/common/style.css";
@@ -15,10 +15,9 @@ import { createHighlightPlugin, highlightPluginKey, setHighlightsMeta, setLoadin
 import { useSyncManager } from "../hooks/useSyncManager";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { RequestNote } from "../types/RequestNote";
-import { appDataDir } from "@tauri-apps/api/path";
+import { toRelativePath } from "../utils/fsUtils";
 
 const AUTOSAVE_DELAY_MS = 300;
-const appDataDirPath = await appDataDir();
 
 export interface TextEditorHandle {
     pushHighlights: (highlights: ResponseHighlight[]) => void;
@@ -27,191 +26,186 @@ export interface TextEditorHandle {
 interface TextEditorProps {
     onMarkdownChange?: (markdown: string) => void;
     onExplainText?: (text: string, from: number, to: number) => void;
-    onFileLoad?: (fileId: String) => Promise<ResponseHighlight[]>;
+    onFileLoad?: (fileId: String) => Promise<ResponseHighlight[] | undefined>;
     onHighlightsChange: (highlights: ResponseHighlight[]) => void;
     onHighlightClick: (id: string) => void;
     initialHighlights: ResponseHighlight[];
     isExplanationLoading: boolean;
 }
 
-const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick, initialHighlights, isExplanationLoading }, ref) => {
-    const hostRef = useRef<HTMLDivElement | null>(null);
-    const crepeRef = useRef<Crepe | null>(null);
-    const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const activeFileIdRef = useRef<string | null>(null);
-    const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
-    const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
-    const { scheduleSync } = useSyncManager();
-    const { syncEnabled, setStatus } = useSyncStatus();
-    const [currentNote, setCurrentNote] = useState<RequestNote | null>();
-    const isCreatingNoteRef = useRef(false);
+const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
+    ({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick, initialHighlights, isExplanationLoading }, ref) => {
+        const hostRef = useRef<HTMLDivElement | null>(null);
+        const crepeRef = useRef<Crepe | null>(null);
+        const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+        const activeFileIdRef = useRef<string | null>(null);
+        const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
+        const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
+        const { scheduleSync } = useSyncManager();
+        const { syncEnabled, setStatus, currentNote, setCurrentNote, isNoteLoading } = useSyncStatus();
+        const syncEnabledRef = useRef(syncEnabled);
+        const currentNoteRef = useRef(currentNote);
+        const isNoteLoadingRef = useRef(false);
+        const isCreatingNoteRef = useRef(false);
 
-    useEffect(() => {
-        if (!activeFileIdRef.current || !syncEnabled) return;
+        const cbRef = useRef({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick });
+        useEffect(() => { cbRef.current = { onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick } });
 
-        const relativePath = toRelativePath(activeFileIdRef.current);
-        invoke<RequestNote | null>("get_note_by_path", {request: relativePath})
-        .then((note) => setCurrentNote(note))
-        .catch(console.error);
-    }, [activeFileIdRef.current, syncEnabled]);
+        useEffect(() => { highlightsRef.current = initialHighlights; }, [initialHighlights]);
+        useEffect(() => { explanationLoadingRef.current = isExplanationLoading; }, [isExplanationLoading]);
 
-    const cbRef = useRef({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick });
-    useEffect(() => { cbRef.current = { onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick } });
+        useEffect(() => { isNoteLoadingRef.current = isNoteLoading }, [isNoteLoading]);
 
-    useEffect(() => { highlightsRef.current = initialHighlights; }, [initialHighlights]);
-    useEffect(() => { explanationLoadingRef.current = isExplanationLoading; }, [isExplanationLoading]);
+        useEffect(() => { syncEnabledRef.current = syncEnabled }, [syncEnabled]);
+        useEffect(() => { currentNoteRef.current = currentNote }, [currentNote]);
 
-    useEffect(() => {
-        const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
-        if (!view || view.isDestroyed) return;
+        useEffect(() => {
+            const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
+            if (!view || view.isDestroyed) return;
 
-        view.dispatch(view.state.tr.setMeta(setLoadingMeta, isExplanationLoading));
-    }, [isExplanationLoading]);
+            view.dispatch(view.state.tr.setMeta(setLoadingMeta, isExplanationLoading));
+        }, [isExplanationLoading]);
 
-    useImperativeHandle(ref, () => ({
-        pushHighlights: (highlights: ResponseHighlight[]) => {
-            crepeRef.current?.editor.action((ctx) => {
-                const view = ctx.get(editorViewCtx);
-                if (view.isDestroyed) return;
-                view.dispatch(view.state.tr.setMeta(setHighlightsMeta, highlights));
-            });
-        },
-    }));
+        useImperativeHandle(ref, () => ({
+            pushHighlights: (highlights: ResponseHighlight[]) => {
+                crepeRef.current?.editor.action((ctx) => {
+                    const view = ctx.get(editorViewCtx);
+                    if (view.isDestroyed) return;
+                    view.dispatch(view.state.tr.setMeta(setHighlightsMeta, highlights));
+                });
+            },
+        }));
 
-    function toRelativePath(fullPath: string) {
-        const normalised = fullPath.replace(/\\/g, "/");
-        const base = appDataDirPath.replace(/\\/g, "/");
-        return normalised?.startsWith(base) ? normalised.slice(base.length).replace(/^\//, "") : fullPath;
-    }
+        const { activeFileId } = useActiveFile();
 
-    const { activeFileId } = useActiveFile();
+        const cancelAutosave = useCallback(() => {
+            if (autosaveTimerRef.current) {
+                clearTimeout(autosaveTimerRef.current);
+                autosaveTimerRef.current = null;
+            }
+        }, []);
 
-    const cancelAutosave = useCallback(() => {
-        if (autosaveTimerRef.current) {
-            clearTimeout(autosaveTimerRef.current);
-            autosaveTimerRef.current = null;
-        }
-    }, []);
-
-    const scheduleAutosave = useCallback(
-        (content: string) => {
-            cancelAutosave(); // timer reset
-            autosaveTimerRef.current = setTimeout(async () => {
-                const fileId = activeFileIdRef.current;
-                if (!fileId) return;
-                try {
-                    await invoke("create_file", { path: fileId, contents: content });
-                }
-                catch (e) {
-                    console.error("Autosave failed: ", e);
-                }
-            }, AUTOSAVE_DELAY_MS);
-        },
-        [cancelAutosave]
-    );
-
-    const flushAutosave = useCallback(async () => {
-        cancelAutosave();
-        const fileId = activeFileIdRef.current;
-        if (!fileId || !crepeRef.current) return;
-
-        try {
-            const content = crepeRef.current.editor.action(getMarkdown());
-            await invoke("create_file", { path: fileId, contents: content });
-        }
-        catch (e) {
-            console.error("Flush save failed: ", e);
-        }
-    }, [cancelAutosave]);
-
-    useEffect(() => {
-        if (!hostRef.current) return;
-
-        const crepe = new Crepe({
-            root: hostRef.current,
-            defaultValue: "",
-        });
-
-        crepe.editor.config((ctx => {
-            ctx.get(listenerCtx).markdownUpdated(async (_ctx, markdown) => {
-                scheduleAutosave(markdown);
-                cbRef.current.onMarkdownChange?.(markdown);
-
-                if (!syncEnabled) return;
-
-                if (!currentNote && !isCreatingNoteRef.current) {
-                    isCreatingNoteRef.current = true;
+        const scheduleAutosave = useCallback(
+            (content: string) => {
+                cancelAutosave(); // timer reset
+                autosaveTimerRef.current = setTimeout(async () => {
+                    const fileId = activeFileIdRef.current;
+                    if (!fileId) return;
                     try {
-                        const path = toRelativePath(activeFileIdRef.current!);
-
-                        const createdNote = await invoke<RequestNote>("create_note", { request: { text: markdown, path: path } });
-                        setCurrentNote(createdNote);
+                        await invoke("create_file", { path: fileId, contents: content });
                     }
                     catch (e) {
-                        console.error("Error creating note: ", e);
+                        console.error("Autosave failed: ", e);
                     }
-                    finally {
-                        isCreatingNoteRef.current = false;
+                }, AUTOSAVE_DELAY_MS);
+            },
+            [cancelAutosave]
+        );
+
+        const flushAutosave = useCallback(async () => {
+            cancelAutosave();
+            const fileId = activeFileIdRef.current;
+            if (!fileId || !crepeRef.current) return;
+
+            try {
+                const content = crepeRef.current.editor.action(getMarkdown());
+                await invoke("create_file", { path: fileId, contents: content });
+            }
+            catch (e) {
+                console.error("Flush save failed: ", e);
+            }
+        }, [cancelAutosave]);
+
+        useEffect(() => {
+            if (!hostRef.current) return;
+
+            const crepe = new Crepe({
+                root: hostRef.current,
+                defaultValue: "",
+            });
+
+            crepe.editor.config((ctx => {
+                ctx.get(listenerCtx).markdownUpdated(async (_ctx, markdown) => {
+                    scheduleAutosave(markdown);
+                    cbRef.current.onMarkdownChange?.(markdown);
+
+                    if (!syncEnabled) return;
+
+                    if (!currentNoteRef.current && !isCreatingNoteRef.current && !isNoteLoadingRef.current) {
+                        isCreatingNoteRef.current = true;
+                        try {
+                            const path = await toRelativePath(activeFileIdRef.current!);
+
+                            const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: markdown, path: path } });
+                            setCurrentNote(createdNote);
+                        }
+                        catch (e) {
+                            console.error("Error creating note: ", e);
+                        }
+                        finally {
+                            isCreatingNoteRef.current = false;
+                        }
                     }
-                }
 
-                if (isCreatingNoteRef.current || !currentNote) return;
+                    if (isCreatingNoteRef.current || !currentNoteRef.current) return;
 
-                isCreatingNoteRef.current = true;
-                setStatus("pending");
-                scheduleSync(`note-${currentNote.id}`, 
-                    { type: "note", id: String(currentNote.id), payload: { id: currentNote.id, text: markdown, path: currentNote.path } });
-                isCreatingNoteRef.current = false;
-            })
-        }))
-            .use(
-                $prose(() =>
-                    selectionTooltipPlugin((text, from, to) =>
-                        cbRef.current.onExplainText?.(text, from, to)
+                    isCreatingNoteRef.current = true;
+                    setStatus("syncing");
+                    scheduleSync(`note-${currentNoteRef.current?.id}`,
+                        { type: "note", id: String(currentNoteRef.current?.id), payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path } });
+                    setCurrentNote({ ...currentNoteRef.current, text: markdown });
+                    setStatus("idle");
+                    isCreatingNoteRef.current = false;
+                })
+            }))
+                .use(
+                    $prose(() =>
+                        selectionTooltipPlugin((text, from, to) =>
+                            cbRef.current.onExplainText?.(text, from, to)
+                        )
                     )
                 )
-            )
-            .use(
-                $prose(() =>
-                    createHighlightPlugin({
-                        getHighlights: () => highlightsRef.current,
-                        onHighlightsChange: (h) => cbRef.current.onHighlightsChange(h),
-                        onHighlightClick: (id) => cbRef.current.onHighlightClick(id)
-                    })
-                ));
+                .use(
+                    $prose(() =>
+                        createHighlightPlugin({
+                            getHighlights: () => highlightsRef.current,
+                            onHighlightsChange: (h) => cbRef.current.onHighlightsChange(h),
+                            onHighlightClick: (id) => cbRef.current.onHighlightClick(id)
+                        })
+                    ));
 
-        crepe.create();
+            crepe.create();
 
-        crepeRef.current = crepe;
+            crepeRef.current = crepe;
 
-        return () => {
-            cancelAutosave();
-            crepe.destroy();
-            crepeRef.current = null;
-        };
-    }, [cancelAutosave]);
+            return () => {
+                cancelAutosave();
+                crepe.destroy();
+                crepeRef.current = null;
+            };
+        }, [cancelAutosave]);
 
-    useEffect(() => {
-        if (!activeFileId) return;
+        useEffect(() => {
+            if (!activeFileId) return;
 
-        flushAutosave().then(async () => {
-            activeFileIdRef.current = activeFileId;
+            flushAutosave().then(async () => {
+                activeFileIdRef.current = activeFileId;
 
-            const [content, highlights] = await Promise.all([
-                invoke<string>("read_file", { path: activeFileId }),
-                cbRef.current.onFileLoad?.(activeFileId) ?? Promise.resolve([]),
-            ]);
+                const [content, highlights] = await Promise.all([
+                    invoke<string>("read_file", { path: activeFileId }),
+                    cbRef.current.onFileLoad?.(activeFileId) ?? Promise.resolve([]),
+                ]);
 
-            crepeRef.current?.editor.action(replaceAll(String(content)));
+                crepeRef.current?.editor.action(replaceAll(String(content)));
 
-            const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
-            if (view && !view.isDestroyed) {
-                view.dispatch(view.state.tr.setMeta(highlightPluginKey, highlights));
-            }
-        })
-    }, [activeFileId, cancelAutosave, flushAutosave]);
+                const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
+                if (view && !view.isDestroyed) {
+                    view.dispatch(view.state.tr.setMeta(highlightPluginKey, highlights));
+                }
+            })
+        }, [activeFileId, cancelAutosave, flushAutosave]);
 
-    return <div className="h-full w-full min-h-0 nodrag overflow-x-hidden overflow-y-auto" ref={hostRef} />;
-});
+        return <div className="h-full w-full min-h-0 nodrag overflow-x-hidden overflow-y-auto" ref={hostRef} />;
+    });
 
 export default TextEditor;

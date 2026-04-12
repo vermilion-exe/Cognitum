@@ -11,6 +11,8 @@ export function useSyncManager() {
         (key: string, operation: Omit<SyncOperation, "timestamp">) => {
             queue.current.set(key, { ...operation, timestamp: Date.now() });
 
+            invoke("save_sync_queue", { queue: Object.fromEntries(queue.current) });
+
             if (timers.current.has(key)) {
                 clearTimeout(timers.current.get(key)!);
             }
@@ -24,6 +26,8 @@ export function useSyncManager() {
                     try {
                         await invoke(`create_${op.type}`, { request: op.payload });
                         queue.current.delete(key);
+
+                        invoke("save_sync_queue", { queue: Object.fromEntries(queue.current) });
                     } catch (e) {
                         console.error(`Backup failed for ${key}`, e);
                     }
@@ -34,5 +38,10 @@ export function useSyncManager() {
         }, []
     );
 
-    return { scheduleSync };
+    // Function to save local sync timestamp
+    const saveLocalTimestamp = useCallback(async (timestamp: number) => {
+        await invoke("save_sync_timestamp", { timestamp });
+    }, []);
+
+    return { scheduleSync, saveLocalTimestamp };
 }

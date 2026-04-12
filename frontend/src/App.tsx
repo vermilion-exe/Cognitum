@@ -6,7 +6,6 @@ import AppLayout from './AppLayout';
 import AuthLayout from './AuthLayout';
 
 function App() {
-
     return (
         <Router>
             <Routes>
