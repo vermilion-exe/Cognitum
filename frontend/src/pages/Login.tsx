@@ -5,12 +5,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { RequestAuth } from '../types/RequestAuth';
 import { ResponseAuth } from '../types/ResponseAuth';
 import { useUser } from '../contexts/UserContext';
+import { useToast } from '../hooks/useToast';
 
 function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { setUser } = useUser();
     const navigate = useNavigate();
+    const toast = useToast();
 
     function handleReturn() {
         navigate('/');
@@ -18,11 +20,12 @@ function Login() {
 
     async function handleLogin() {
         const payload: RequestAuth = { email, password };
-        await invoke<ResponseAuth>("request_register", payload)
+        await invoke<ResponseAuth>("request_auth", { request: payload })
             .then(async (result) => {
                 setUser({ userId: result.user_id, email: result.email, username: result.username });
-                await invoke("save_token", { token: result.access_token, is_refresh_token: false });
-                await invoke("save_token", { token: result.refresh_token, is_refresh_token: true });
+                await invoke("save_token", { token: result.access_token, isRefreshToken: false });
+                await invoke("save_token", { token: result.refresh_token, isRefreshToken: true });
+                toast.success("Login successful");
 
                 const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
@@ -34,7 +37,8 @@ function Login() {
                 }
             })
             .catch((e) => {
-                console.error("Command failed: ", e);
+                toast.error("Login failed due to an error");
+                console.error("Login failed: ", e);
             });
     }
 

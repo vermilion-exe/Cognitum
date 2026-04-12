@@ -22,7 +22,9 @@ function ChoosePath() {
     }
 
     function onSubmit() {
-        navigate("/mainPage");
+        if (path) {
+            navigate("/mainPage");
+        }
     }
 
     return (

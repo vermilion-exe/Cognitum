@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useUser } from '../contexts/UserContext';
 import { RequestRegister } from '../types/RequestRegister';
 import { ResponseAuth } from '../types/ResponseAuth';
+import { useToast } from '../hooks/useToast';
 
 function Register() {
     const [username, setUsername] = useState('');
@@ -12,6 +13,7 @@ function Register() {
     const [password, setPassword] = useState('');
     const { setUser } = useUser();
     const navigate = useNavigate();
+    const toast = useToast();
 
     function handleReturn() {
         navigate('/');
@@ -24,6 +26,7 @@ function Register() {
                 setUser({ userId: result.user_id, email: result.email, username: result.username });
                 await invoke("save_token", { token: result.access_token, isRefreshToken: false });
                 await invoke("save_token", { token: result.refresh_token, isRefreshToken: true });
+                toast.success("Register successful");
 
                 const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
@@ -35,7 +38,8 @@ function Register() {
                 }
             })
             .catch((e) => {
-                console.error("Command failed: ", e);
+                toast.error("Register failed due to an error");
+                console.error("Register failed: ", e);
             });
     }
 
