@@ -1,12 +1,18 @@
 import { Outlet } from "react-router-dom";
-import { SideBar, TitleBar, Explorer } from "./components";
 import { useState } from "react";
+import { SideBar, TitleBar, Explorer } from "./components";
 import { FileTreeProvider } from "./contexts/FileTreeContext";
 import { ActiveFileProvider } from "./contexts/ActiveFileContext";
 import { UserProvider } from "./contexts/UserContext";
 import { SyncProvider } from "./contexts/SyncContext";
+import { useAuthErrorListener } from "./hooks/useAuthErrorListener";
+import { useSyncPoller } from "./hooks/useSyncPoller";
+import { ToastProvider } from "./contexts/ToastContext";
+import { ToastContainer } from "react-toastify";
 
 function AppLayoutInner() {
+    useAuthErrorListener();
+    useSyncPoller();
     const [explorerHidden, setExplorerHidden] = useState(false);
 
     return (
@@ -35,14 +41,26 @@ function AppLayoutInner() {
 
 export default function AppLayout() {
     return (
-        <SyncProvider>
+        <ToastProvider>
             <UserProvider>
                 <ActiveFileProvider>
-                    <FileTreeProvider>
-                        <AppLayoutInner />
-                    </FileTreeProvider>
+                    <SyncProvider>
+                        <FileTreeProvider>
+                            <AppLayoutInner />
+                        </FileTreeProvider>
+                    </SyncProvider>
                 </ActiveFileProvider>
             </UserProvider>
-        </SyncProvider>
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                pauseOnHover
+                draggable
+                theme="dark"
+            />
+        </ToastProvider>
     );
 }
