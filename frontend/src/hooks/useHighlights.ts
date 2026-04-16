@@ -28,33 +28,30 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
         }
         catch (e) {
             console.error("Could not read highlights:", e);
-        }
-        finally {
             isInitialHighlightLoad.current = false;
         }
     }
 
     // Save highlight to database if sync is enabled
     async function backupHighlight(highlight: ResponseHighlight) {
-        setStatus("pending");
+        setStatus("syncing");
         scheduleSync(`highlight-${highlight.id}`,
             {
-                type: "highlight",
+                type: "explanation",
                 id: String(highlight.id),
-                payload: { id: highlight.id, from: highlight?.from, to: highlight?.to, selected_text: highlight?.selected_text, created_at: highlight?.created_at, note_id: currentNote?.id }
+                payload: { id: highlight.id, from: highlight?.from, to: highlight?.to, selected_text: highlight?.selected_text, explanation: highlight?.explanation, created_at: highlight?.created_at, note_id: currentNote?.id }
             });
+        setStatus("idle");
     }
 
     // Save the highlights locally if they change
     useEffect(() => {
-        if (activeFileId && !isInitialHighlightLoad) {
+        if (activeFileId && !isInitialHighlightLoad.current) {
             invoke("save_highlights", { fileId: activeFileId, highlights });
             const highlight = highlights.find((x) => x.id === activeHighlightId);
+
             if (highlights.length === 0 || !highlight) {
                 setActiveHighlightId(null);
-            }
-            else if (syncEnabled) {
-                backupHighlight(highlight);
             }
         }
     }, [highlights]);
@@ -81,6 +78,10 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
             note_id: currentNote.id!,
         };
 
+        if (syncEnabled) {
+            backupHighlight(entry);
+        }
+
         setHighlights((prev) => {
             const next = [...prev, entry];
             editorRef.current?.pushHighlights(next);
@@ -98,6 +99,9 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
             invoke("remove_highlight", { fileId: activeFileId, highlightId: id });
             return next;
         });
+        if (syncEnabled) {
+            invoke("delete_explanation", { highlightId: id });
+        }
     }
 
     // Handle highlight regeneration

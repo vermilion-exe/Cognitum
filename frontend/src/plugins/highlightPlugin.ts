@@ -19,6 +19,7 @@ export const highlightPluginKey = new PluginKey<PluginState>("highlight-explanat
 
 export const setHighlightsMeta = "highlight/setHighlights";
 export const setLoadingMeta = "highlight/setLoading";
+export const setFullReplaceMeta = "highlight/fullReplace";
 
 function findText(doc: Node, text: string): { from: number; to: number } | null {
     let found: { from: number; to: number } | null = null;
@@ -41,31 +42,6 @@ function validateAndRestore(doc: Node, highlights: ResponseHighlight[]): Respons
     });
 }
 
-function buildDecorations(doc: Node, highlights: ResponseHighlight[]): DecorationSet {
-    const decorations = highlights
-        .filter((h) => h.from < h.to && h.to <= doc.content.size)
-        .map((h) =>
-            Decoration.inline(h.from, h.to, {
-                class: "highlight-explanation",
-                "data-highlight-id": h.id,
-            })
-        );
-    return DecorationSet.create(doc, decorations);
-}
-
-function createLoadingWidget(view: EditorView): Decoration {
-    const pos = view.state.selection.to;
-
-    const toDOM = () => {
-        const span = document.createElement("span");
-        span.className = "animate-spin inline-block";
-        span.textContent = "⏳";
-        return span;
-    }
-
-    return Decoration.widget(pos, toDOM, {side: 1, key: "loading-spinner"});
-}
-
 export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<PluginState> {
     const { getHighlights, onHighlightsChange, onHighlightClick } = options;
 
@@ -82,7 +58,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                 loadingAnchor: null,
             }),
             apply: (tr, pluginState): PluginState => {
-                let {highlights, loadingAnchor}: PluginState = pluginState;
+                let { highlights, loadingAnchor }: PluginState = pluginState;
 
                 const nextHighlights = tr.getMeta(setHighlightsMeta);
                 if (nextHighlights !== undefined) {
@@ -97,6 +73,9 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                     loadingAnchor = null;
                 }
 
+                if (tr.getMeta(setFullReplaceMeta)) {
+                    highlights = validateAndRestore(tr.doc, getHighlights());
+                }
                 if (tr.docChanged && loadingAnchor !== null) {
                     loadingAnchor = tr.mapping.map(loadingAnchor, 1);
                 }
@@ -114,17 +93,17 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                     // Notify React if any highlights were dropped
                     if (mapped.length < highlights.length)
                         queueMicrotask(() => onHighlightsChange(mapped));
-                    
+
                     highlights = mapped;
                 }
 
-                return {highlights, loadingAnchor};
+                return { highlights, loadingAnchor };
             },
         },
 
         props: {
-            decorations: (state) =>{
-                const {highlights, loadingAnchor} = highlightPluginKey.getState(state) ?? {highlights: [], loadingAnchor: null};
+            decorations: (state) => {
+                const { highlights, loadingAnchor } = highlightPluginKey.getState(state) ?? { highlights: [], loadingAnchor: null };
                 const decorations = highlights
                     .filter((h: ResponseHighlight) => h.from < h.to && h.to <= state.doc.content.size)
                     .map((h: ResponseHighlight) =>
@@ -163,7 +142,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                         ?.dataset.highlightId;
                     if (!id || !popover) return false;
 
-                    const {highlights} = highlightPluginKey.getState(view.state) as PluginState;
+                    const { highlights } = highlightPluginKey.getState(view.state) as PluginState;
                     const h = highlights.find(
                         (h) => h.id === id
                     );

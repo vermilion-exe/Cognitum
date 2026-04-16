@@ -11,7 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { selectionTooltipPlugin } from "../plugins/selectionTooltipPlugin";
 import { ResponseHighlight } from "../types/ResponseHighlight";
 import { editorViewCtx } from "@milkdown/core";
-import { createHighlightPlugin, highlightPluginKey, setHighlightsMeta, setLoadingMeta } from "../plugins/highlightPlugin";
+import { createHighlightPlugin, setFullReplaceMeta, setHighlightsMeta, setLoadingMeta } from "../plugins/highlightPlugin";
 import { useSyncManager } from "../hooks/useSyncManager";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { RequestNote } from "../types/RequestNote";
@@ -38,7 +38,8 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         const hostRef = useRef<HTMLDivElement | null>(null);
         const crepeRef = useRef<Crepe | null>(null);
         const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-        const activeFileIdRef = useRef<string | null>(null);
+        const activeFileIdRef = useRef<string | undefined>(null);
+        const { activeFileId } = useActiveFile();
         const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
         const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
         const { scheduleSync } = useSyncManager();
@@ -59,6 +60,8 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         useEffect(() => { syncEnabledRef.current = syncEnabled }, [syncEnabled]);
         useEffect(() => { currentNoteRef.current = currentNote }, [currentNote]);
 
+        // useEffect(() => { activeFileIdRef.current = activeFileId }, [activeFileId]);
+
         useEffect(() => {
             const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
             if (!view || view.isDestroyed) return;
@@ -75,8 +78,6 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                 });
             },
         }));
-
-        const { activeFileId } = useActiveFile();
 
         const cancelAutosave = useCallback(() => {
             if (autosaveTimerRef.current) {
@@ -102,14 +103,17 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             [cancelAutosave]
         );
 
-        const flushAutosave = useCallback(async () => {
+        const flushAutosave = useCallback(async (fileId?: string) => {
             cancelAutosave();
-            const fileId = activeFileIdRef.current;
-            if (!fileId || !crepeRef.current) return;
+            const targetId = fileId;
+            if (!targetId || !crepeRef.current) return;
 
             try {
+                const view = crepeRef.current.editor.action((ctx) => ctx.get(editorViewCtx));
+                if (!view || view.isDestroyed) return;
+
                 const content = crepeRef.current.editor.action(getMarkdown());
-                await invoke("create_file", { path: fileId, contents: content });
+                await invoke("create_file", { path: targetId, contents: content });
             }
             catch (e) {
                 console.error("Flush save failed: ", e);
@@ -188,19 +192,19 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         useEffect(() => {
             if (!activeFileId) return;
 
-            flushAutosave().then(async () => {
-                activeFileIdRef.current = activeFileId;
+            const previousFileId = activeFileIdRef.current;
+            activeFileIdRef.current = activeFileId;
 
-                const [content, highlights] = await Promise.all([
-                    invoke<string>("read_file", { path: activeFileId }),
-                    cbRef.current.onFileLoad?.(activeFileId) ?? Promise.resolve([]),
-                ]);
+            flushAutosave(previousFileId!).then(async () => {
+                const highlights = await (cbRef.current.onFileLoad?.(activeFileIdRef.current!));
+                highlightsRef.current = highlights!;
 
+                const content = await invoke<string>("read_file", { path: activeFileIdRef.current });
                 crepeRef.current?.editor.action(replaceAll(String(content)));
 
                 const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
                 if (view && !view.isDestroyed) {
-                    view.dispatch(view.state.tr.setMeta(highlightPluginKey, highlights));
+                    view.dispatch(view.state.tr.setMeta(setFullReplaceMeta, true));
                 }
             })
         }, [activeFileId, cancelAutosave, flushAutosave]);

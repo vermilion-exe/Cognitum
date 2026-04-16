@@ -70,7 +70,7 @@ export function useFlashcards() {
     }, [currentNote?.text, activeFileId, syncEnabled]);
 
     const checkForRelevance = async () => {
-        const irrelevantIds = await invoke<bigint[]>("check_flashcard_irrelevance", { noteId: currentNote?.id! });
+        const irrelevantIds = await invoke<bigint[]>("check_flashcard_relevance", { noteId: currentNote?.id! });
 
         setFlashcards((prev) =>
             prev.map((f) => irrelevantIds.includes(f.id) ? { ...f, is_stale: true } : f));
