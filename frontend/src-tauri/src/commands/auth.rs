@@ -2,8 +2,10 @@ use reqwest::Client;
 
 use crate::commands::config::{load_token, save_token_internal};
 use crate::entities::request_auth::RequestAuth;
+use crate::entities::request_confirmation::RequestConfirmation;
 use crate::entities::request_register::RequestRegister;
 use crate::entities::response_auth::ResponseAuth;
+use crate::entities::response_operation::ResponseOperation;
 use crate::utils::{send_request, AuthMode};
 use crate::AppState;
 
@@ -60,4 +62,53 @@ pub async fn refresh_token(client: &Client, base_url: &str) -> Result<String, St
 
     save_token_internal(&new_token, false)?;
     Ok(new_token)
+}
+
+#[tauri::command]
+pub async fn logout(state: tauri::State<'_, AppState>) -> Result<ResponseOperation, String> {
+    let url = format!("{}/auth/logout", &state.base_url);
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.post(&url);
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn confirm_code(
+    state: tauri::State<'_, AppState>,
+    request: RequestConfirmation,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/auth/confirm", &state.base_url);
+
+    send_request(&state, AuthMode::None, |client, _| {
+        let request = client.post(&url).json(&request);
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn email_send_code(
+    state: tauri::State<'_, AppState>,
+    email: String,
+    is_change_password: bool,
+) -> Result<bool, String> {
+    let url = format!("{}/auth/email", &state.base_url);
+    let params = [
+        ("email", email),
+        ("isChangePassword", is_change_password.to_string()),
+    ];
+
+    let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+
+    send_request(&state, AuthMode::None, |client, _| {
+        let request = client.get(url.clone());
+        request.send()
+    })
+    .await
 }

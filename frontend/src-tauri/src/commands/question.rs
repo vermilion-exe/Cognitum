@@ -47,7 +47,7 @@ pub async fn update_stale_flashcards(
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
     send_request(&state, AuthMode::Bearer, |client, token| {
-        let mut request = client.get(url.clone()).json(&flashcard_ids);
+        let mut request = client.put(url.clone()).json(&flashcard_ids);
         if let Some(t) = token {
             request = request.bearer_auth(t);
         }

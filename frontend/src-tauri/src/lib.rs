@@ -29,6 +29,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             auth::request_register,
             auth::request_auth,
+            auth::logout,
+            auth::confirm_code,
+            auth::email_send_code,
             config::save_user,
             config::load_user,
             config::clear_user,
@@ -56,11 +59,13 @@ pub fn run() {
             explanation::remove_highlight,
             explanation::get_explanations_by_note_id,
             explanation::create_explanation,
+            explanation::delete_explanation,
             explanation::remove_local_highlights,
             note::get_all_notes,
             note::save_note_metadata,
             note::get_local_note,
             note::get_local_notes,
+            note::move_note,
             note::get_notes_since, // New command for polling
             note::get_note_by_path,
             note::create_note,

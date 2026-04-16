@@ -1,7 +1,10 @@
 use std::{collections::HashMap, fs};
 
 use crate::{
-    entities::{request_summary::RequestSummary, response_summary::ResponseSummary},
+    entities::{
+        request_summary::RequestSummary, response_operation::ResponseOperation,
+        response_summary::ResponseSummary,
+    },
     utils::{send_request, AuthMode},
     AppState,
 };
@@ -55,10 +58,10 @@ pub async fn get_summary_by_note_id(
 pub async fn create_summary(
     request: ResponseSummary,
     state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<ResponseOperation, String> {
     let url = format!("{}/summary", &state.base_url);
 
-    send_request(&state, AuthMode::Bearer, |client, token| {
+    send_request::<ResponseOperation, _, _>(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.post(&url).json(&request);
         if let Some(t) = token {
             request = request.bearer_auth(t);
@@ -86,7 +89,7 @@ pub async fn get_summaries_since(
 }
 
 #[tauri::command]
-pub async fn save_summary(app: AppHandle, summary: ResponseSummary) -> Result<(), String> {
+pub async fn save_summary(app: AppHandle, summary: String, file_id: String) -> Result<(), String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -97,11 +100,11 @@ pub async fn save_summary(app: AppHandle, summary: ResponseSummary) -> Result<()
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Err("Note metadata file non-existent".to_string());
+        HashMap::new()
     };
 
     let summary_json = serde_json::to_string_pretty(&summary).map_err(|e| e.to_string())?;
-    mappings.insert(summary.note_id.to_string(), summary_json);
+    mappings.insert(file_id, summary_json);
 
     if let Some(parent) = mappings_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -112,7 +115,7 @@ pub async fn save_summary(app: AppHandle, summary: ResponseSummary) -> Result<()
 }
 
 #[tauri::command]
-pub async fn get_local_summary(app: AppHandle, note_id: u64) -> Result<ResponseSummary, String> {
+pub async fn get_local_summary(app: AppHandle, file_id: String) -> Result<String, String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -127,8 +130,8 @@ pub async fn get_local_summary(app: AppHandle, note_id: u64) -> Result<ResponseS
     };
 
     let value = mappings
-        .get(&note_id.to_string())
+        .get(&file_id)
         .ok_or_else(|| "Note summary not found".to_string())?;
 
-    serde_json::from_str(&value).map_err(|e| e.to_string())?
+    serde_json::from_str(&value).map_err(|e| e.to_string())
 }

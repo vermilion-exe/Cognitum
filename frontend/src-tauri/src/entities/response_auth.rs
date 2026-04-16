@@ -7,6 +7,7 @@ pub struct ResponseAuth {
     pub access_token: String,
     pub refresh_token: String,
     pub user_id: String,
+    pub is_active: bool,
     pub username: String,
     pub email: String,
 }

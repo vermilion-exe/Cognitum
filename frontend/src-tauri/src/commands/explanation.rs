@@ -4,7 +4,10 @@ use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
 use crate::{
-    entities::{response_explanation::ResponseExplanation, response_highlight::ResponseHighlight},
+    entities::{
+        response_explanation::ResponseExplanation, response_highlight::ResponseHighlight,
+        response_operation::ResponseOperation,
+    },
     utils::{send_request, AuthMode},
     AppState,
 };
@@ -130,11 +133,28 @@ pub async fn get_explanations_by_note_id(
 pub async fn create_explanation(
     request: ResponseHighlight,
     state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<ResponseOperation, String> {
     let url = format!("{}/explanation", &state.base_url);
 
-    send_request(&state, AuthMode::Bearer, |client, token| {
+    send_request::<ResponseOperation, _, _>(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.post(&url).json(&request);
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_explanation(
+    state: tauri::State<'_, AppState>,
+    highlight_id: String,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/explanation/{}", &state.base_url, highlight_id);
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.delete(&url);
         if let Some(t) = token {
             request = request.bearer_auth(t);
         }

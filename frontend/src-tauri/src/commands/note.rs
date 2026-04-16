@@ -91,6 +91,27 @@ pub async fn get_notes_since(
 }
 
 #[tauri::command]
+pub async fn move_note(
+    state: tauri::State<'_, AppState>,
+    old_path: String,
+    new_path: String,
+) -> Result<RequestNote, String> {
+    let url = format!("{}/note/move", &state.base_url);
+    let params = [("oldPath", old_path), ("newPath", new_path)];
+
+    let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.post(url.clone());
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn save_note_metadata(
     app: AppHandle,
     path: String,
