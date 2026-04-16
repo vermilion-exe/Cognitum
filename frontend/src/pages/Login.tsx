@@ -27,6 +27,12 @@ function Login() {
                 await invoke("save_token", { token: result.refresh_token, isRefreshToken: true });
                 toast.success("Login successful");
 
+                console.log(result.is_active);
+                if (!result.is_active) {
+                    navigate('/emailConfirmation');
+                    return;
+                }
+
                 const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
                 if (!cfg.vaultPath) {

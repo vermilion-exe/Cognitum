@@ -62,8 +62,10 @@ function TitleBar({ isAuth, }: { isAuth: boolean; }) {
                                 }
                             })
                         }
-                        {openFileNodes.length > 0 && <div className='outline outline-white/40 mt-4 mb-2.5' />}
-                        <button className="nodrag mt-2 mb-1 hover:bg-background-secondary">+</button>
+                        {openFileNodes.length > 0 && (<>
+                            <div className='outline outline-white/40 mt-4 mb-2.5' />
+                            <button className="nodrag mt-2 mb-1 hover:bg-background-secondary">+</button>
+                        </>)}
                     </div>
                 )
             }

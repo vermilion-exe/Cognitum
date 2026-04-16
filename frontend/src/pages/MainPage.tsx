@@ -25,30 +25,19 @@ function MainPage() {
         renderedHtml,
         isSummaryOpen,
         setIsSummaryOpen,
-        setIsSummaryLoading,
-        setDisplayedText,
-        setFullText } = useSummary({ markdownRef: markdownRef });
+        hasEnoughChars } = useSummary({ markdownRef: markdownRef });
 
     const { flashcards, reviewCard, isFlashcardOverlayOpen, setIsFlashcardOverlayOpen } = useFlashcards();
 
     return (
         <div className="flex flex-1 h-full overflow-hidden">
-            <div className="grow bg-background-primary min-h-0 overflow-hidden relative">
-                <div className="flex justify-end w-full">
-                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2" onClick={() => setIsFlashcardOverlayOpen(true)} disabled={!flashcards}>Revise</button>
-                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2"
-                        onClick={handleSummarize} disabled={isSummaryLoading}>{isSummaryLoading ? "Summarizing..." : "Summarize"}</button>
+            <div className="grow bg-background-primary min-h-0 overflow-hidden flex flex-col">
+                <div className="flex justify-end w-full sticky z-10 shrink-0">
+                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2 hover:bg-button-secondary/50"
+                        onClick={() => setIsFlashcardOverlayOpen(true)} disabled={!flashcards}>Revise</button>
+                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2 hover:bg-button-secondary/50"
+                        onClick={() => setIsSummaryOpen(true)} disabled={isSummaryLoading}>{isSummaryLoading ? "Summarizing..." : "Summarize"}</button>
                 </div>
-                {
-                    isSummaryOpen && (
-                        <SummaryAccordion isLoading={isSummaryLoading} text={renderedHtml} onClose={() => {
-                            setIsSummaryOpen(false);
-                            setIsSummaryLoading(false);
-                            setDisplayedText("");
-                            setFullText("");
-                        }} />
-                    )
-                }
                 <TextEditor
                     onMarkdownChange={(md) => { markdownRef.current = md }}
                     ref={editorRef}
@@ -61,6 +50,11 @@ function MainPage() {
                 />
             </div>
 
+            {isSummaryOpen && (
+                <SummaryAccordion isLoading={isSummaryLoading} text={renderedHtml} onClose={() => {
+                    setIsSummaryOpen(false);
+                }} onRegenerate={handleSummarize} hasEnoughChars={hasEnoughChars} />
+            )}
             {activeHighlight && activeHighlightId &&
                 (<ExplanationAccordion
                     activeHighlight={activeHighlight}
