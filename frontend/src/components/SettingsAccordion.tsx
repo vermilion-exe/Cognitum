@@ -2,12 +2,16 @@ import { useUser } from "../contexts/UserContext";
 import userIcon from "../assets/user.svg";
 import lockIcon from "../assets/lock.svg";
 import deleteIcon from "../assets/delete.svg";
+import openDirectoryIcon from "../assets/directory_open.svg";
+import logoutIcon from "../assets/log_out.svg";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useNavigate } from "react-router-dom";
 
 function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: boolean) => void; }) {
     const { user } = useUser();
     const [noteDirectory, setNoteDirectory] = useState("");
+    const navigate = useNavigate();
 
     useEffect(() => {
         const getNoteDirectory = async () => {
@@ -17,6 +21,21 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
 
         getNoteDirectory();
     }, []);
+
+    const handleLogout = async () => {
+        try {
+            await invoke("logout");
+            await invoke("clear_user");
+            await invoke("clear_token", { isRefreshToken: false });
+            await invoke("clear_token", { isRefreshToken: true });
+        }
+        catch (e) {
+            console.error("Could not log out:", e);
+        }
+        finally {
+            navigate("/");
+        }
+    }
 
     return (
         <div
@@ -52,28 +71,36 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
                     </div>
                     <div>
                         <h1 className="text-xl">Note Directory</h1>
-                        <p>{noteDirectory ? noteDirectory : ""}</p>
+                        <div className="flex h-6 w-120 items-center cursor-pointer">
+                            <img src={openDirectoryIcon} className="border border-background-secondary rounded-l-md h-full" />
+                            <p className="border border-background-secondary rounded-r-md">{noteDirectory ? noteDirectory : ""}</p>
+                        </div>
                     </div>
                 </div>
 
                 {/* Footer Actions */}
                 <div className="flex justify-center gap-3 border-t border-background-primary p-6 pt-4">
                     <button
-                        className="flex gap-1 rounded-lg bg-button-primary px-4 py-2 text-sm text-white transition hover:bg-button-primary/50"
+                        className="flex gap-1 rounded-lg bg-button-primary px-4 py-2 text-sm text-white transition hover:bg-button-primary/50 w-45 items-center"
                     //onClick={() => onRegenerate(activeHighlight.id)}
                     >
                         <img src={lockIcon} />
                         Change Password
                     </button>
                     <button
-                        className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition hover:bg-red-700"
+                        className="flex gap-1 rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition hover:bg-red-700 w-45 items-center"
                     //onClick={() => onDelete(activeHighlight.id)}
                     >
-                        Delete
+                        <img src={deleteIcon} />
+                        Delete Account
+                    </button>
+                    <button className="flex gap-1 rounded-lg bg-button-secondary px-4 py-2 text-sm text-white transition hover:bg-button-secondary/50 w-45 items-center" onClick={handleLogout}>
+                        <img src={logoutIcon} className="w-4 h-4" />
+                        Logout
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
