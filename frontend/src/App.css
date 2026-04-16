@@ -147,6 +147,23 @@ html, body, #root {
   background: transparent;
 }
 
+[data-drag-over="true"] {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+*::-webkit-scrollbar {
+    width: 6px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
 @theme {
     --color-button-primary: #7899D4;
     --color-button-secondary: #7E7E7E;

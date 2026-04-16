@@ -2,15 +2,16 @@ import ExplorerTree from './ExplorerTree';
 import addFileIcon from "../assets/add_file.svg";
 import addDirectoryIcon from "../assets/add_directory.svg";
 import uploadIcon from "../assets/upload.svg";
-import { invoke } from '@tauri-apps/api/core';
 import { useState } from 'react';
 import { useFileTree } from '../contexts/FileTreeContext';
-import { FsNode } from '../types/FsNode';
+import { findNodeShallow } from '../utils/fsUtils';
+import { useToast } from '../hooks/useToast';
 
 function Explorer() {
     const [createType, setCreateType] = useState<String>();
     const [nodeName, setNodeName] = useState<string>("");
-    const { root, setRoot } = useFileTree();
+    const { root, createNode } = useFileTree();
+    const toast = useToast();
 
     const onCreateFile = () => {
         setCreateType("file");
@@ -22,25 +23,26 @@ function Explorer() {
 
     const handleNameSelection = async () => {
         if (createType === "directory") {
-            await invoke("create_directory", { path: root?.id.concat("/" + nodeName) });
+            const newPath = root?.id.concat("\\" + nodeName);
+            if (findNodeShallow(root, newPath!)) {
+                toast.warning("Directory with this name already exists");
+                console.log("Directory already exists");
+                return;
+            }
+
+            // await invoke("create_directory", { path: newPath });
+            createNode(root?.id!, nodeName, true);
         }
         else {
-            await invoke("create_file", { path: root?.id.concat("/" + nodeName + ".md") });
+            const newPath = root?.id.concat("\\" + nodeName + ".md");
+            if (findNodeShallow(root, newPath!)) {
+                toast.warning("File with this name already exists");
+                console.log("File already exists");
+                return;
+            }
+
+            createNode(root?.id!, nodeName, false);
         }
-
-        const children = await invoke<FsNode[]>("scan_dir", {
-            path: root?.id,
-            recursive: true,
-        });
-
-
-        setRoot({
-            id: root!.id,
-            name: root!.name,
-            kind: "dir",
-            children,
-        });
-
 
         setCreateType(undefined);
         setNodeName("");

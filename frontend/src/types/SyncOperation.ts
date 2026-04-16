@@ -1,5 +1,5 @@
 type SyncOperation = {
-    type: "note" | "highlight" | "summary" | "question";
+    type: "note" | "explanation" | "summary" | "question";
     id: string;
     payload: unknown;
     timestamp: number;

@@ -13,6 +13,22 @@ export function getFileNodes(root: FsNode | undefined, openIds: Set<string>): Fs
     );
 }
 
+export function findNode(root: FsNode | undefined, nodeId: string): FsNode | null {
+    return collectAllNodes(root?.children ?? []).filter(node => node.id === nodeId)[0];
+}
+
+export function findNodeInDir(root: FsNode | undefined, targetId: string, newNodeId: string): FsNode | undefined {
+    const allNodes = collectAllNodes(root?.children ?? []);
+    const targetNode = allNodes.find((node) => node.id === targetId);
+
+    if (!targetNode?.children || targetNode?.children.length === 0) return undefined;
+
+    return targetNode.children.find((node) => node.id === newNodeId);
+}
+
+export function findNodeShallow(root: FsNode | undefined, nodeId: string): FsNode | undefined {
+    return root?.children!.filter(node => node.id === nodeId)[0];
+}
 
 export async function toRelativePath(fullPath?: string) {
     if (!fullPath) return;

@@ -1,10 +1,22 @@
 import { FsNode } from "../types/FsNode";
 import directoryIcon from "../assets/directory.svg";
 import openDirectoryIcon from "../assets/directory_open.svg";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useActiveFile } from "../contexts/ActiveFileContext";
 import { useFileTree } from "../contexts/FileTreeContext";
 import { invoke } from "@tauri-apps/api/core";
+import { findNode, findNodeInDir, toRelativePath } from "../utils/fsUtils";
+import { join } from "@tauri-apps/api/path";
+import { createPortal } from "react-dom";
+import { useToast } from "../hooks/useToast";
+import { useSyncStatus } from "../contexts/SyncContext";
+import { ContextMenuOption } from "../types/ContextMenuOption";
+import { useSyncManager } from "../hooks/useSyncManager";
+
+let dragState: {
+    nodeId: string;
+    node: FsNode;
+} | null = null;
 
 function ExplorerTree({ nodes, depthPipes = [], isRoot, }:
     { nodes: FsNode[]; depthPipes?: boolean[]; isRoot: boolean; }) {
@@ -36,50 +48,124 @@ function ExplorerTree({ nodes, depthPipes = [], isRoot, }:
 }
 
 function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node: FsNode; pipes: boolean[]; isLast: boolean; isOpen: boolean; isActive: boolean; toggleOpen: (e: React.MouseEvent, node: FsNode) => void; }) {
-    const { root, setRoot } = useFileTree();
-    const [isDragOver, setIsDragOver] = useState(false);
-    const [draggedNode, setDraggedNode] = useState<FsNode>();
+    const { root, setRoot, createNode } = useFileTree();
+    const { syncEnabled, setStatus } = useSyncStatus();
+    const { scheduleSync } = useSyncManager();
+    const [isDragging, setIsDragging] = useState(false);
+    const rowRef = useRef<HTMLDivElement>(null);
+    const dragStartPos = useRef<{ x: number, y: number } | null>(null);
+    const didStartDrag = useRef(false);
+    const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+    const toast = useToast();
+    const drag_threshold = 5;
 
-    const handleDragStart = (e: React.DragEvent) => {
+    // Context Menu
+
+    const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
-        e.stopPropagation();
-        console.log("start dragging node: ", draggedNode?.id);
-        setDraggedNode(node);
+        setContextMenu({ x: e.clientX, y: e.clientY });
     }
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log("dragging node: ", draggedNode?.id);
-        if (node.kind === "dir" && draggedNode?.id !== node.id) {
-            setIsDragOver(true);
+    const handleNewFile = async () => {
+        createNode(node.id, "Untitled", false);
+    }
+
+    const handleNewDir = async () => {
+        createNode(node.id, "Untitled", true);
+    }
+
+    const contextOptions: ContextMenuOption[] = [
+        ...(node.kind === "dir"
+            ? [
+                {
+                    label: "New File",
+                    onClick: async () => (await handleNewFile()),
+                },
+                {
+                    label: "New Folder",
+                    onClick: async () => (await handleNewDir()),
+                },
+            ] : []),
+        {
+            label: "Delete",
+            danger: true,
+            onClick: 
         }
+    ]
+
+    // Node Drag
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const onDragOver = (e: PointerEvent) => {
+            setDragPos({ x: e.clientX, y: e.clientY });
+        };
+
+        window.addEventListener("pointermove", onDragOver);
+        return () => window.removeEventListener("pointermove", onDragOver);
+    }, [isDragging]);
+
+    const moveNotes = async (node: FsNode, parentPath: string) => {
+        if (node.kind === "dir") {
+            await Promise.all((node.children ?? []).map(async (node) => {
+                const newPath = await join(parentPath, node.name);
+                await moveNotes(node, newPath);
+            }));
+            return;
+        }
+
+        const oldPath = await toRelativePath(node.id);
+        const newPath = await join(parentPath, node.name + ".md");
+        const relativeNewPath = await toRelativePath(newPath);
+        if (!relativeNewPath) return;
+
+        await invoke("move_note", { oldPath: oldPath, newPath: relativeNewPath })
     }
 
-    const handleDragLeave = () => {
-        setIsDragOver(false);
+    const isDescendant = (parentId: string, childId: string): boolean => {
+        return childId.startsWith(parentId + "/");
     }
 
-    const handleDrop = async (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragOver(false);
+    const performDrop = async (targetId: string) => {
+        if (!dragState) return;
 
-        if (!draggedNode || node.kind !== "dir" || draggedNode.id === node.id) return;
+        const draggedNode = findNode(root, dragState.nodeId);
+        if (!draggedNode) return;
+        else if (draggedNode.id === targetId) return;
+        else if (isDescendant(draggedNode.id, targetId)) return;
 
-        const newPath = `${node.id}/${draggedNode.name}`;
+        const newPath = `${targetId}\\${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`;
 
-        await invoke("move_node", {
-            from: draggedNode.id,
-            to: newPath,
-        });
+        if (findNodeInDir(root, targetId, newPath)) {
+            toast.warning("Node in given directory already exists");
+            console.log("Node in directory already exists");
+            dragStartPos.current = null;
+            setIsDragging(false);
+            dragState = null;
+            return;
+        }
+
+        if (syncEnabled) {
+            try {
+                await moveNotes(draggedNode, targetId);
+            }
+            catch (e) {
+                console.error("Couldn't move notes");
+                dragStartPos.current = null;
+                setIsDragging(false);
+                dragState = null;
+                return;
+            }
+        }
+
+        await invoke("move_node", { from: draggedNode.id, to: newPath });
 
         const children = await invoke<FsNode[]>("scan_dir", {
             path: root?.id,
             recursive: true,
         });
-
-        console.log("dropped that bitch: ", draggedNode?.id);
 
         setRoot({
             id: root!.id,
@@ -87,27 +173,98 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
             kind: "dir",
             children,
         });
-        setDraggedNode(undefined);
     }
 
-    const handleDragEnd = () => {
-        setDraggedNode(undefined);
-        setIsDragOver(false);
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (e.button !== 0) return;
+
+        dragStartPos.current = { x: e.clientX, y: e.clientY };
+        didStartDrag.current = false;
+    }
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!dragStartPos.current) return;
+
+        const dx = e.clientX - dragStartPos.current.x;
+        const dy = e.clientY - dragStartPos.current.y;
+
+        if (!didStartDrag.current) {
+            if (Math.abs(dx) + Math.abs(dy) < drag_threshold) return;
+            didStartDrag.current = true;
+            setIsDragging(true);
+            dragState = { nodeId: node.id, node };
+            rowRef.current?.setPointerCapture(e.pointerId);
+        }
+
+        setDragPos({ x: e.clientX, y: e.clientY });
+
+        const elements = document.elementsFromPoint(e.clientX, e.clientY);
+        document
+            .querySelectorAll("[data-drag-over='true']")
+            .forEach((el) => el.setAttribute("data-drag-over", "false"));
+
+        const dropTarget = elements.find(
+            (el) =>
+                el.getAttribute("data-drop-id") !== null &&
+                el.getAttribute("data-drop-kind") === "dir" &&
+                el.getAttribute("data-drop-id") !== dragState?.nodeId
+        );
+
+        if (dropTarget) {
+            dropTarget.setAttribute("data-drag-over", "true");
+        }
+    }
+
+    const handlePointerUp = async (e: React.PointerEvent) => {
+        if (rowRef.current?.hasPointerCapture(e.pointerId)) {
+            rowRef.current.releasePointerCapture(e.pointerId);
+        }
+
+        if (!didStartDrag.current) {
+            dragStartPos.current = null;
+            toggleOpen(e as unknown as React.MouseEvent, node);
+            return;
+        }
+
+        document
+            .querySelectorAll("[data-drag-over='true']")
+            .forEach((el) => el.setAttribute("data-drag-over", "false"));
+
+        const elements = document.elementsFromPoint(e.clientX, e.clientY);
+        const dropTarget = elements.find(
+            (el) =>
+                el.getAttribute("data-drop-id") !== null &&
+                el.getAttribute("data-drop-kind") === "dir"
+        );
+
+        if (dropTarget && dragState) {
+            const targetId = dropTarget.getAttribute("data-drop-id")!;
+            await performDrop(targetId);
+        }
+
+        dragStartPos.current = null;
+        setIsDragging(false);
+        dragState = null;
     }
 
     return (
         <div
-            className={`${isActive ? "active-" : ""}tree-row ${isDragOver ? "bg-white/10" : ""}`} onClick={(e) => toggleOpen(e, node)}
-            draggable
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}>
-            <div className={`flex items-center gap-2 min-w-0 bg-background-primary/20 text-white/20 absolute w-full px-2 py-1 rounded-md ${!draggedNode ? "hidden" : ""}`} react-cursor-follow>
-                {node.kind === "dir" ? (isOpen ? (<img className="w-7 h-7" src={openDirectoryIcon} />) : (<img className="w-6 h-6" src={directoryIcon} />)) : null}
-                <span className="tree-label truncate">{node.name}</span>
-            </div>
+            ref={rowRef}
+            className={`${isActive ? "active-" : ""}tree-row ${isDragging ? "bg-white/10" : ""}`}
+            data-drop-id={node.id}
+            data-drop-kind={node.kind}
+            data-drag-over="false"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            style={{ touchAction: "none" }}
+        >
+            {isDragging && createPortal(
+                <div className="flex items-center gap-2 min-w-0 bg-background-primary/20 text-white/20 absolute px-2 py-1 rounded-md w-80" style={{ left: dragPos.x + 12, top: dragPos.y + 12 }}>
+                    {node.kind === "dir" ? (isOpen ? (<img className="w-7 h-7" src={openDirectoryIcon} />) : (<img className="w-6 h-6" src={directoryIcon} />)) : null}
+                    <span className="tree-label truncate">{node.name}</span>
+                </div>, document.body
+            )}
             <div className='flex items-stretch'>
                 {pipes.map((on, i) => (
                     <div key={i} className="relative">
