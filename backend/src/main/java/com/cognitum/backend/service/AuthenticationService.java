@@ -4,6 +4,7 @@ import com.cognitum.backend.dto.request.RequestAuthentication;
 import com.cognitum.backend.dto.request.RequestConfirmation;
 import com.cognitum.backend.dto.request.RequestRegister;
 import com.cognitum.backend.dto.response.ResponseAuthentication;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUserInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -13,10 +14,10 @@ public interface AuthenticationService {
 
     ResponseEntity<ResponseAuthentication> register(RequestRegister requestRegister);
     ResponseEntity<ResponseAuthentication> authenticate(RequestAuthentication requestAuthentication);
-    void logout(String token);
+    ResponseOperation logout(String token);
     ResponseEntity<ResponseAuthentication> refreshToken(HttpServletRequest request, HttpServletResponse response);
-    void confirmUser(RequestConfirmation requestConfirmation);
-//    ResponseEntity<Boolean> emailSendCodeChangePassword(String email);
+    ResponseOperation confirmUser(RequestConfirmation requestConfirmation);
+    ResponseEntity<Boolean> emailSendCode(String email, Boolean isChangePassword);
 //    ResponseEntity<Boolean> changePassword(RequestChangePassword changePassword);
 //    ResponseEntity<Boolean> changeUsername(String token, RequestChangeUsername changeUsername);
     ResponseUserInfo getUser(String token);

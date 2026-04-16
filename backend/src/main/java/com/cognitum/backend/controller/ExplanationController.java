@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -31,6 +32,12 @@ public class ExplanationController {
     public ResponseOperation createExplanation(@RequestHeader("Authorization") String token,
                                                @RequestBody RequestHighlight request) {
             return explanationService.createExplanation(token, request);
+     }
+
+     @DeleteMapping("/{id}")
+    public ResponseOperation deleteExplanation(@RequestHeader("Authorization") String token,
+                                               @PathVariable UUID id) {
+         return explanationService.deleteExplanation(token, id);
      }
 
 }

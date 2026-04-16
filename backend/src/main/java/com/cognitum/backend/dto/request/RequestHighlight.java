@@ -1,5 +1,6 @@
 package com.cognitum.backend.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,10 +16,14 @@ import java.util.UUID;
 public class RequestHighlight {
 
     private UUID id;
+    @JsonProperty("selected_text")
     private String selectedText;
+    private String explanation;
     private Integer from;
     private Integer to;
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
+    @JsonProperty("note_id")
     private Long noteId;
 
 }

@@ -5,6 +5,7 @@ import com.cognitum.backend.dto.request.RequestRefreshToken;
 import com.cognitum.backend.dto.request.RequestRegister;
 import com.cognitum.backend.dto.request.RequestAuthentication;
 import com.cognitum.backend.dto.response.ResponseAuthentication;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUserInfo;
 import com.cognitum.backend.service.AuthenticationService;
 import lombok.RequiredArgsConstructor;
@@ -33,10 +34,10 @@ public class AuthenticationController {
         return service.authenticate(request);
     }
 
-    @PostMapping("/logout")
-    public void logout(@RequestHeader(value = "Authorization") String token) {
-        service.logout(token);
-    }
+//    @PostMapping("/logout")
+//    public ResponseOperation logout(@RequestHeader("Authorization") String token) {
+//        return service.logout(token);
+//    }
 
     @SneakyThrows
     @PostMapping("/refresh-token")
@@ -45,14 +46,14 @@ public class AuthenticationController {
     }
 
     @PostMapping("/confirm")
-    public void confirmUser(@RequestBody RequestConfirmation requestConfirmation) {
-        service.confirmUser(requestConfirmation);
+    public ResponseOperation confirmUser(@RequestBody RequestConfirmation requestConfirmation) {
+        return service.confirmUser(requestConfirmation);
     }
 
-//    @GetMapping("/email")
-//    public ResponseEntity<Boolean> emailSendCodeChangePassword(@RequestParam("email") String email) {
-//        return service.emailSendCodeChangePassword(email);
-//    }
+    @GetMapping("/email")
+    public ResponseEntity<Boolean> emailSendCode(@RequestParam("email") String email, @RequestParam("isChangePassword") Boolean isChangePassword) {
+        return service.emailSendCode(email, isChangePassword);
+    }
 
 //    @PostMapping("/change-password")
 //    public ResponseEntity<Boolean> changePassword(@RequestBody RequestChangePassword changePassword) {

@@ -12,6 +12,7 @@ import com.cognitum.backend.service.JwtService;
 import com.cognitum.backend.service.QuestionService;
 import com.cognitum.backend.service.SM2Service;
 import com.cognitum.backend.web.NvidiaWebClient;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
@@ -70,6 +71,7 @@ public class QuestionServiceImpl implements QuestionService {
         return webClient.requestCompletion(request);
     }
 
+    @Transactional
     @Override
     public List<Long> checkFlashcardRelevance(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)

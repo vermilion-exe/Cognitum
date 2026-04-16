@@ -79,4 +79,16 @@ public class NoteServiceImpl implements NoteService {
                 .toList();
     }
 
+    @Override
+    public ResponseNote moveNote(String token, String oldPath, String newPath) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+        Note note = noteRepository.findByUserIdAndPath(user.getId(), oldPath)
+                .orElseThrow(() -> new RuntimeException("Note not found"));
+
+        note.setPath(newPath);
+        Note updatedNote = noteRepository.save(note);
+
+        return new ResponseNote(updatedNote.getId(), updatedNote.getText(), updatedNote.getPath(), updatedNote.getCreatedAt(), updatedNote.getLastUpdated());
+    }
+
 }

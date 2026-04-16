@@ -18,7 +18,7 @@ import java.util.UUID;
 public class Explanation {
 
     @Id
-    @GeneratedValue(generator = "uuid2")
+//    @GeneratedValue(generator = "uuid2")
     @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
@@ -31,7 +31,7 @@ public class Explanation {
     @Column(name = "selected_text")
     private String selectedText;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String explanation;
 
     @Column(name = "created_at")

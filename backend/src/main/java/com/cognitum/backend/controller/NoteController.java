@@ -32,6 +32,11 @@ public class NoteController {
         return noteService.getNotesSince(token, timestamp);
     }
 
+    @PostMapping("/move")
+    public ResponseNote moveNote(@RequestHeader("Authorization") String token, @RequestParam String oldPath, @RequestParam String newPath) {
+        return noteService.moveNote(token, oldPath, newPath);
+    }
+
     @PostMapping
     public ResponseNote createNote(@RequestHeader("Authorization") String token, @RequestBody RequestNote request) {
         return noteService.createNote(token, request);

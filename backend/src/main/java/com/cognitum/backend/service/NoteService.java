@@ -12,5 +12,6 @@ public interface NoteService {
     ResponseNote createNote(String token, RequestNote requestNote);
     ResponseNote getNoteByPath(String token, String path);
     List<ResponseNote> getNotesSince(String token, LocalDateTime timestamp);
+    ResponseNote moveNote(String token, String oldPath, String newPath);
 
 }

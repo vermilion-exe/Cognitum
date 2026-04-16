@@ -4,6 +4,7 @@ import com.cognitum.backend.dto.request.RequestAuthentication;
 import com.cognitum.backend.dto.request.RequestConfirmation;
 import com.cognitum.backend.dto.request.RequestRegister;
 import com.cognitum.backend.dto.response.ResponseAuthentication;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.dto.response.ResponseUserInfo;
 import com.cognitum.backend.entity.Token;
@@ -50,7 +51,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setUsername(requestRegister.getUsername());
         Long confirmationCode = generateRandomConfirmationCode();
         user.setCode(confirmationCode);
-        emailService.sendEmail(user.getEmail(), confirmationCode);
+        emailService.sendEmail(user.getEmail(), confirmationCode, false);
 
         User savedUser = userRepository.save(user);
         if(savedUser.getId() != null){
@@ -62,6 +63,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .accessToken(jwtToken)
                     .refreshToken(refreshToken)
                     .userId(savedUser.getId())
+                    .isActive(savedUser.getIsActive())
                     .username(savedUser.getActualUsername())
                     .email(savedUser.getEmail())
                     .build());
@@ -85,6 +87,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .accessToken(jwtToken)
                     .refreshToken(refreshToken)
                     .userId(user.getId())
+                    .isActive(user.getIsActive())
                     .username(user.getActualUsername())
                     .email(user.getEmail())
                     .build());
@@ -94,10 +97,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
-    public void logout(String token) {
+    public ResponseOperation logout(String token) {
         ResponseUser user = jwtService.getTokenInfo(token);
         revokeAllUserTokens(userRepository.findByEmail(user.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("User with email " + user.getEmail() + " not found")));
+        return new ResponseOperation(true);
     }
 
     private void saveUserToken(User user, String jwtToken) {
@@ -138,6 +142,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .accessToken(jwtToken)
                         .refreshToken(refreshToken)
                         .userId(user.getId())
+                        .isActive(user.getIsActive())
                         .username(user.getActualUsername())
                         .email(user.getEmail())
                         .build());
@@ -148,27 +153,28 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
-    public void confirmUser(RequestConfirmation requestConfirmation) {
+    public ResponseOperation confirmUser(RequestConfirmation requestConfirmation) {
         Optional<User> user = userRepository.findByEmail(requestConfirmation.getEmail());
         if(user.isPresent() && user.get().getCode().equals(requestConfirmation.getCode())){
             user.get().setIsActive(true);
             userRepository.save(user.get());
         }
+        return new ResponseOperation(true);
     }
 
-//    @Override
-//    public ResponseEntity<Boolean> emailSendCodeChangePassword(String email) {
-//        return userRepository.findByEmail(email)
-//                .map(user -> {
-//                    Long confirmationCode = generateRandomConfirmationCode();
-//                    user.setCode(confirmationCode);
-//                    userRepository.save(user);
-//
-//                    Boolean codeSentSuccessfully = emailService.sendEmail(email, confirmationCode);
-//
-//                    return ResponseEntity.ok(codeSentSuccessfully);
-//                }).orElse(ResponseEntity.badRequest().body(false));
-//    }
+    @Override
+    public ResponseEntity<Boolean> emailSendCode(String email, Boolean isChangePassword) {
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    Long confirmationCode = generateRandomConfirmationCode();
+                    user.setCode(confirmationCode);
+                    userRepository.save(user);
+
+                    emailService.sendEmail(email, confirmationCode, isChangePassword);
+
+                    return ResponseEntity.ok(true);
+                }).orElse(ResponseEntity.badRequest().body(false));
+    }
 
 //    @Override
 //    public ResponseEntity<Boolean> changePassword(RequestChangePassword changePassword) {

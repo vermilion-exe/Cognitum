@@ -35,7 +35,7 @@ public class ExplanationServiceImpl implements ExplanationService {
         RequestCompletion request = new RequestCompletion();
         request.setModel(nvidiaProperties.getModel());
         request.setMessages(List.of(
-                new RequestMessage("system", "You are an expert computer science tutor. Explain concepts clearly and concisely."),
+                new RequestMessage("system", "You are an expert computer science tutor. Explain concepts clearly and concisely. The explanation should be no longer than 200 words and in LaTeX format when appropriate."),
                 new RequestMessage("user", "Explain the following concept: " + text)
         ));
         request.setMaxTokens(1024);
@@ -57,6 +57,7 @@ public class ExplanationServiceImpl implements ExplanationService {
 
         explanation.setId(request.getId());
         explanation.setSelectedText(request.getSelectedText());
+        explanation.setExplanation(request.getExplanation());
         explanation.setFrom(request.getFrom());
         explanation.setTo(request.getTo());
         explanation.setCreatedAt(request.getCreatedAt());
@@ -108,6 +109,21 @@ public class ExplanationServiceImpl implements ExplanationService {
             requestHighlight.setNoteId(explanation.getNote().getId());
             return requestHighlight;
         }).toList();
+    }
+
+    @Override
+    public ResponseOperation deleteExplanation(String token, UUID id) {
+        Explanation explanation = explanationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Explanation not found with id: " + id));
+
+        ResponseUser user = jwtService.getTokenInfo(token);
+        if(!explanation.getNote().getUserId().equals(user.getId()) ) {
+            throw new RuntimeException("Unauthorized to delete explanation with id: " + id);
+        }
+
+        explanationRepository.delete(explanation);
+
+        return new ResponseOperation(true);
     }
 
 }

@@ -14,13 +14,14 @@ public class EmailServiceImpl implements EmailService {
     private final JavaMailSender javaMailSender;
 
     @Override
-    public void sendEmail(String email, Long confirmCode) {
+    public void sendEmail(String email, Long confirmCode, Boolean isChangePassword) {
+        String subject = isChangePassword ? "Confirmation Code for Password Change" : "Confirmation Code for Email Confirmation";
         try {
             MimeMessage mimeMessage = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
             helper.setText("Your confirmation code : " + confirmCode, true);
             helper.setTo(email);
-            helper.setSubject("Confirmation Code for Password Change");
+            helper.setSubject(subject);
             helper.setFrom("cognitumapp@gmail.com");
             javaMailSender.send(mimeMessage);
         }

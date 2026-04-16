@@ -18,6 +18,8 @@ public class ResponseAuthentication {
     private String refreshToken;
     @JsonProperty("user_id")
     private UUID userId;
+    @JsonProperty("is_active")
+    private Boolean isActive;
     private String username;
     private String email;
 
