@@ -18,4 +18,5 @@ pub struct ResponseFlashcard {
     pub next_review: NaiveDate,
     #[ts(type = "string")]
     pub last_reviewed: Option<DateTime<Utc>>,
+    pub note_id: u64,
 }

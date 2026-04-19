@@ -126,7 +126,7 @@ pub async fn get_local_summary(app: AppHandle, file_id: String) -> Result<String
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Err("Note metadata file non-existent".to_string());
+        return Err("Summary for file non-existent".to_string());
     };
 
     let value = mappings
@@ -134,4 +134,25 @@ pub async fn get_local_summary(app: AppHandle, file_id: String) -> Result<String
         .ok_or_else(|| "Note summary not found".to_string())?;
 
     serde_json::from_str(&value).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_local_summary(app: AppHandle, file_id: String) -> Result<(), String> {
+    let mappings_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("summaries.json");
+
+    let mut mappings: HashMap<String, String> = if mappings_path.exists() {
+        let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())?
+    } else {
+        return Err("Summary for file non-existent".to_string());
+    };
+
+    mappings.remove(&file_id);
+
+    let json = serde_json::to_string_pretty(&mappings).map_err(|e| e.to_string())?;
+    fs::write(&mappings_path, json).map_err(|e| e.to_string())
 }

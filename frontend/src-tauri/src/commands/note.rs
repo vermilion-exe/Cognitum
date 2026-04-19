@@ -1,7 +1,10 @@
 use std::{collections::HashMap, fs};
 
 use crate::{
-    entities::request_note::RequestNote,
+    entities::{
+        request_delete::RequestDelete, request_move::RequestMove, request_note::RequestNote,
+        response_operation::ResponseOperation,
+    },
     utils::{send_request, AuthMode},
     AppState,
 };
@@ -93,16 +96,35 @@ pub async fn get_notes_since(
 #[tauri::command]
 pub async fn move_note(
     state: tauri::State<'_, AppState>,
-    old_path: String,
-    new_path: String,
+    request: RequestMove,
 ) -> Result<RequestNote, String> {
     let url = format!("{}/note/move", &state.base_url);
-    let params = [("oldPath", old_path), ("newPath", new_path)];
+    let params = [("oldPath", request.old_path), ("newPath", request.new_path)];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
     send_request(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.post(url.clone());
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_note(
+    state: tauri::State<'_, AppState>,
+    request: RequestDelete,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/note", &state.base_url);
+    let params = [("path", request.path)];
+
+    let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.delete(url.clone());
         if let Some(t) = token {
             request = request.bearer_auth(t);
         }
@@ -149,7 +171,7 @@ pub async fn save_note_metadata(
 }
 
 #[tauri::command]
-pub async fn get_local_notes(app: AppHandle) -> Result<Vec<RequestNote>, String> {
+pub async fn get_local_notes(app: AppHandle) -> Result<Option<Vec<RequestNote>>, String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -160,7 +182,7 @@ pub async fn get_local_notes(app: AppHandle) -> Result<Vec<RequestNote>, String>
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Err("Note metadata file non-existent".to_string());
+        return Ok(None);
     };
 
     mappings
@@ -170,7 +192,7 @@ pub async fn get_local_notes(app: AppHandle) -> Result<Vec<RequestNote>, String>
 }
 
 #[tauri::command]
-pub async fn get_local_note(app: AppHandle, path: String) -> Result<RequestNote, String> {
+pub async fn get_local_note(app: AppHandle, path: String) -> Result<Option<RequestNote>, String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -181,7 +203,7 @@ pub async fn get_local_note(app: AppHandle, path: String) -> Result<RequestNote,
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Err("Note metadata file non-existent".to_string());
+        return Ok(None);
     };
 
     let metadata = mappings

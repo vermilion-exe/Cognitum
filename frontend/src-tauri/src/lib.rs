@@ -53,6 +53,7 @@ pub fn run() {
             summarizer::create_summary,
             summarizer::save_summary,
             summarizer::get_local_summary,
+            summarizer::remove_local_summary,
             explanation::request_explanation,
             explanation::save_highlights,
             explanation::read_highlights,
@@ -69,6 +70,7 @@ pub fn run() {
             note::get_notes_since, // New command for polling
             note::get_note_by_path,
             note::create_note,
+            note::delete_note,
             explanation::get_highlights_since, // New command for polling
             summarizer::get_summaries_since,   // New command for polling
             question::generate_flashcards,
@@ -82,6 +84,7 @@ pub fn run() {
             question::delete_flashcard,
             question::save_local_flashcards,
             question::load_local_flashcards,
+            question::remove_local_flashcards,
             question::save_review_queue,
             question::load_review_queue,
             config::save_sync_timestamp, // New command for saving sync timestamp

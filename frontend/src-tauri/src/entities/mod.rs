@@ -1,6 +1,8 @@
 pub mod card_review;
 pub mod request_auth;
 pub mod request_confirmation;
+pub mod request_delete;
+pub mod request_move;
 pub mod request_note;
 pub mod request_register;
 pub mod request_summary;

@@ -44,6 +44,7 @@ pub struct FSNode {
     pub name: String,
     pub kind: String,
     pub children: Vec<FSNode>,
+    pub last_modified: Option<u64>,
 }
 
 #[tauri::command]
@@ -81,6 +82,12 @@ pub fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode
         };
 
         let id = p.to_string_lossy().to_string();
+        let last_modified = entry
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
 
         if file_type.is_dir() {
             let children = if recursive {
@@ -93,6 +100,7 @@ pub fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode
                 name,
                 kind: "dir".to_string(),
                 children,
+                last_modified,
             });
         } else if file_type.is_file() {
             nodes.push(FSNode {
@@ -100,6 +108,7 @@ pub fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode
                 name,
                 kind: "file".to_string(),
                 children: vec![],
+                last_modified,
             });
         }
     }

@@ -228,6 +228,25 @@ pub async fn load_local_flashcards(
 }
 
 #[tauri::command]
+pub async fn remove_local_flashcards(
+    state: State<'_, AppState>,
+    note_id: u64,
+) -> Result<(), String> {
+    let flashcards_path = &state
+        .app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join(format!("flashcards_{}.json", note_id));
+
+    if !flashcards_path.exists() {
+        return Ok(());
+    }
+
+    fs::remove_file(&flashcards_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn save_review_queue(
     state: State<'_, AppState>,
     queue: HashMap<u64, CardReview>,
