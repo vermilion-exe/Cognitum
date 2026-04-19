@@ -44,4 +44,7 @@ public class Note {
     @OneToMany(mappedBy = "note", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Flashcard> flashcards;
 
+    @OneToOne(mappedBy = "note", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Summary summary;
+
 }

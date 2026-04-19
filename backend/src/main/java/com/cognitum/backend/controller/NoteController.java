@@ -2,6 +2,7 @@ package com.cognitum.backend.controller;
 
 import com.cognitum.backend.dto.request.RequestNote;
 import com.cognitum.backend.dto.response.ResponseNote;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.service.NoteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -40,6 +41,11 @@ public class NoteController {
     @PostMapping
     public ResponseNote createNote(@RequestHeader("Authorization") String token, @RequestBody RequestNote request) {
         return noteService.createNote(token, request);
+    }
+
+    @DeleteMapping
+    public ResponseOperation deleteNote(@RequestHeader("Authorization") String token, @RequestParam String path) {
+        return noteService.deleteNote(token, path);
     }
 
 }

@@ -178,7 +178,8 @@ public class QuestionServiceImpl implements QuestionService {
                     savedFlashcard.getInterval(),
                     savedFlashcard.getRepetitions(),
                     savedFlashcard.getNextReview(),
-                    savedFlashcard.getLastReviewed()
+                    savedFlashcard.getLastReviewed(),
+                    noteId
             );
         }).toList();
     }
@@ -222,7 +223,8 @@ public class QuestionServiceImpl implements QuestionService {
                     flashcard.getInterval(),
                     flashcard.getRepetitions(),
                     flashcard.getNextReview(),
-                    flashcard.getLastReviewed()
+                    flashcard.getLastReviewed(),
+                    flashcard.getNote().getId()
             );
         }).toList();
     }
@@ -268,7 +270,8 @@ public class QuestionServiceImpl implements QuestionService {
                 fc.getInterval(),
                 fc.getRepetitions(),
                 fc.getNextReview(),
-                fc.getLastReviewed()
+                fc.getLastReviewed(),
+                noteId
         )).toList();
     }
 

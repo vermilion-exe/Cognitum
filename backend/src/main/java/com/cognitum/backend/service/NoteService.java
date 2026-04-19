@@ -2,6 +2,7 @@ package com.cognitum.backend.service;
 
 import com.cognitum.backend.dto.request.RequestNote;
 import com.cognitum.backend.dto.response.ResponseNote;
+import com.cognitum.backend.dto.response.ResponseOperation;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,5 +14,6 @@ public interface NoteService {
     ResponseNote getNoteByPath(String token, String path);
     List<ResponseNote> getNotesSince(String token, LocalDateTime timestamp);
     ResponseNote moveNote(String token, String oldPath, String newPath);
+    ResponseOperation deleteNote(String token, String path);
 
 }

@@ -2,6 +2,7 @@ package com.cognitum.backend.service.impl;
 
 import com.cognitum.backend.dto.request.RequestNote;
 import com.cognitum.backend.dto.response.ResponseNote;
+import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.entity.Note;
 import com.cognitum.backend.repository.NoteRepository;
@@ -89,6 +90,17 @@ public class NoteServiceImpl implements NoteService {
         Note updatedNote = noteRepository.save(note);
 
         return new ResponseNote(updatedNote.getId(), updatedNote.getText(), updatedNote.getPath(), updatedNote.getCreatedAt(), updatedNote.getLastUpdated());
+    }
+
+    @Override
+    public ResponseOperation deleteNote(String token, String path) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+        Note note = noteRepository.findByUserIdAndPath(user.getId(), path)
+                .orElseThrow(() -> new RuntimeException("Note not found"));
+
+        noteRepository.delete(note);
+
+        return new ResponseOperation(true);
     }
 
 }

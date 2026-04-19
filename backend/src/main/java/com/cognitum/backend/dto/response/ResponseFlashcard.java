@@ -32,5 +32,7 @@ public class ResponseFlashcard {
     private LocalDate nextReview;
     @JsonProperty("last_reviewed")
     private LocalDateTime lastReviewed;
+    @JsonProperty("note_id")
+    private Long noteId;
 
 }
