@@ -42,7 +42,7 @@ class JwtServiceImplTest {
         String token = jwtService.generateToken(user);
 
         assertNotNull(token);
-        assertTrue(token.length() > 0);
+        assertFalse(token.isEmpty());
     }
 
     @Test

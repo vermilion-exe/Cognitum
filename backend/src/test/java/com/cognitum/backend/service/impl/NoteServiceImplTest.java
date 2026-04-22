@@ -45,7 +45,7 @@ class NoteServiceImplTest {
         mockToken = "Bearer mockToken";
         mockUser = ResponseUser.builder()
                 .email("test@example.com")
-                .username("testuser")
+                .username("testUser")
                 .id(UUID.randomUUID())
                 .build();
     }
@@ -182,7 +182,7 @@ class NoteServiceImplTest {
         note2.setLastUpdated(LocalDateTime.now().minusDays(2));
 
         when(noteRepository.findAllByUserIdAndLastUpdatedAfter(mockUser.getId(), timestamp))
-                .thenReturn(Arrays.asList(note1));
+                .thenReturn(List.of(note1));
 
         List<ResponseNote> result = noteService.getNotesSince(mockToken, timestamp);
 
