@@ -2,6 +2,7 @@ use reqwest::Client;
 
 use crate::commands::config::{load_token, save_token_internal};
 use crate::entities::request_auth::RequestAuth;
+use crate::entities::request_change_password::RequestChangePassword;
 use crate::entities::request_confirmation::RequestConfirmation;
 use crate::entities::request_register::RequestRegister;
 use crate::entities::response_auth::ResponseAuth;
@@ -108,6 +109,37 @@ pub async fn email_send_code(
 
     send_request(&state, AuthMode::None, |client, _| {
         let request = client.get(url.clone());
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn change_password(
+    state: tauri::State<'_, AppState>,
+    request: RequestChangePassword,
+) -> Result<bool, String> {
+    let url = format!("{}/auth/change-password", &state.base_url);
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.post(&url).json(&request);
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_user(state: tauri::State<'_, AppState>) -> Result<ResponseOperation, String> {
+    let url = format!("{}/auth", &state.base_url);
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.delete(&url);
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
         request.send()
     })
     .await

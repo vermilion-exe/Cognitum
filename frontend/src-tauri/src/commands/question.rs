@@ -131,9 +131,9 @@ pub async fn get_flashcards_by_note_id(
 pub async fn delete_stale_flashcards(
     state: State<'_, AppState>,
     note_id: u64,
-) -> Result<(), String> {
+) -> Result<ResponseOperation, String> {
     let url = format!("{}/question/flashcards/stale", &state.base_url);
-    let params = [("note_id", note_id.to_string())];
+    let params = [("noteId", note_id.to_string())];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
@@ -168,7 +168,10 @@ pub async fn delete_all_flashcards_by_note_id(
 }
 
 #[tauri::command]
-pub async fn delete_flashcard(state: State<'_, AppState>, flashcard_id: u64) -> Result<(), String> {
+pub async fn delete_flashcard(
+    state: State<'_, AppState>,
+    flashcard_id: u64,
+) -> Result<ResponseOperation, String> {
     let url = format!(
         "{}/question/flashcards/{}",
         &state.base_url,
@@ -284,4 +287,36 @@ pub async fn load_review_queue(
     let text = fs::read_to_string(&review_queue_path).map_err(|e| e.to_string())?;
     let queue = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     Ok(Some(queue))
+}
+
+#[tauri::command]
+pub async fn delete_local_flashcards(state: State<'_, AppState>) -> Result<(), String> {
+    let app_data_dir = state
+        .app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
+
+    let pattern = app_data_dir.join("flashcards_*.json");
+    let pattern_str = pattern.to_str().ok_or("Invalid path")?;
+
+    let entries = glob::glob(pattern_str).map_err(|e| e.to_string())?;
+
+    for entry in entries {
+        let path = entry.map_err(|e| e.to_string())?;
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+
+    let review_queue_path = &state
+        .app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("flashcard_review_queue.json");
+
+    if review_queue_path.exists() {
+        fs::remove_file(&review_queue_path).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
 }

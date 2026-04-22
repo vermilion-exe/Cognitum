@@ -14,6 +14,7 @@ use crate::entities::sync_operation::SyncOperation;
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub vault_path: Option<String>,
+    pub sync_enabled: Option<bool>,
 }
 
 pub fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -41,9 +42,38 @@ pub fn save_vault_path(app: AppHandle, vault_path: String) -> Result<(), String>
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
+    let prev_config: AppConfig = fs::read_to_string(path.clone())
+        .ok()
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default();
+
     let cfg = AppConfig {
         vault_path: Some(vault_path),
+        sync_enabled: prev_config.sync_enabled,
     };
+
+    let s = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    fs::write(path, s).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_sync_enabled(app: AppHandle, sync_enabled: bool) -> Result<(), String> {
+    let path = config_path(&app)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let prev_config: AppConfig = fs::read_to_string(path.clone())
+        .ok()
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default();
+
+    let cfg = AppConfig {
+        vault_path: prev_config.vault_path,
+        sync_enabled: Some(sync_enabled),
+    };
+
     let s = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     fs::write(path, s).map_err(|e| e.to_string())
 }
@@ -136,7 +166,11 @@ pub fn clear_token(is_refresh_token: bool) -> Result<(), String> {
     };
     let entry = keyring::Entry::new("cognitum", token_type).map_err(|e| e.to_string())?;
 
-    entry.delete_password().map_err(|e| e.to_string())
+    match entry.get_password() {
+        Ok(_) => entry.delete_password().map_err(|e| e.to_string()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 #[tauri::command]
@@ -180,7 +214,7 @@ pub fn save_sync_progress(app: AppHandle, progress: RequestSyncProgress) -> Resu
 }
 
 #[tauri::command]
-pub fn load_sync_progress(app: AppHandle) -> Result<RequestSyncProgress, String> {
+pub fn load_sync_progress(app: AppHandle) -> Result<Option<RequestSyncProgress>, String> {
     let path = app
         .path()
         .app_data_dir()
@@ -188,7 +222,7 @@ pub fn load_sync_progress(app: AppHandle) -> Result<RequestSyncProgress, String>
         .join("sync_progress.json");
 
     if !path.exists() {
-        return Err("No sync progress found.".to_string());
+        return Ok(None);
     }
 
     let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
@@ -230,7 +264,7 @@ pub fn load_sync_queue(app: AppHandle) -> Result<Option<HashMap<String, SyncOper
         .join("sync_queue.json");
 
     if !path.exists() {
-        return Err("No sync progress found.".to_string());
+        return Ok(None);
     }
 
     let json = fs::read_to_string(path).map_err(|e| e.to_string())?;
@@ -239,4 +273,49 @@ pub fn load_sync_queue(app: AppHandle) -> Result<Option<HashMap<String, SyncOper
     }
     let queue = serde_json::from_str(&json).map_err(|e| e.to_string())?;
     Ok(Some(queue))
+}
+
+#[tauri::command]
+pub fn delete_app_data(app: AppHandle) -> Result<(), String> {
+    let sync_progress_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_progress.json");
+
+    if sync_progress_path.exists() {
+        let _ = fs::remove_file(&sync_progress_path).map_err(|e| e.to_string());
+    }
+
+    let sync_queue_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_queue.json");
+
+    if sync_queue_path.exists() {
+        let _ = fs::remove_file(&sync_queue_path).map_err(|e| e.to_string());
+    }
+
+    let sync_timestamp_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sync_timestamp.json");
+
+    if sync_timestamp_path.exists() {
+        let _ = fs::remove_file(&sync_timestamp_path).map_err(|e| e.to_string());
+    }
+
+    let config_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("config.json");
+
+    if config_path.exists() {
+        fs::remove_file(&config_path).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
 }

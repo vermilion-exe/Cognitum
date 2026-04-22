@@ -133,10 +133,10 @@ pub async fn get_explanations_by_note_id(
 pub async fn create_explanation(
     request: ResponseHighlight,
     state: tauri::State<'_, AppState>,
-) -> Result<ResponseOperation, String> {
+) -> Result<ResponseHighlight, String> {
     let url = format!("{}/explanation", &state.base_url);
 
-    send_request::<ResponseOperation, _, _>(&state, AuthMode::Bearer, |client, token| {
+    send_request::<ResponseHighlight, _, _>(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.post(&url).json(&request);
         if let Some(t) = token {
             request = request.bearer_auth(t);
@@ -211,4 +211,36 @@ pub async fn remove_local_highlights(app: AppHandle, file_id: String) -> Result<
         .join(get_highlight_mapping(&app, &file_id)?);
 
     fs::remove_file(&highlights_path).map_err(|e| e.to_string())
+}
+
+fn remove_highlights_internal(app: &AppHandle, file_id: String) -> Result<(), String> {
+    let highlights_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join(file_id);
+
+    fs::remove_file(&highlights_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_local_highlight_data(app: AppHandle) -> Result<(), String> {
+    let mappings_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("highlight_mappings.json");
+
+    let mappings: HashMap<String, String> = if mappings_path.exists() {
+        let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())?
+    } else {
+        HashMap::new()
+    };
+
+    for (_, filename) in mappings {
+        let _ = remove_highlights_internal(&app, filename);
+    }
+
+    fs::remove_file(&mappings_path).map_err(|e| e.to_string())
 }

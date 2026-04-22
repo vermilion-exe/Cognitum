@@ -1,10 +1,7 @@
 use std::{collections::HashMap, fs};
 
 use crate::{
-    entities::{
-        request_summary::RequestSummary, response_operation::ResponseOperation,
-        response_summary::ResponseSummary,
-    },
+    entities::{request_summary::RequestSummary, response_summary::ResponseSummary},
     utils::{send_request, AuthMode},
     AppState,
 };
@@ -58,10 +55,10 @@ pub async fn get_summary_by_note_id(
 pub async fn create_summary(
     request: ResponseSummary,
     state: tauri::State<'_, AppState>,
-) -> Result<ResponseOperation, String> {
+) -> Result<ResponseSummary, String> {
     let url = format!("{}/summary", &state.base_url);
 
-    send_request::<ResponseOperation, _, _>(&state, AuthMode::Bearer, |client, token| {
+    send_request(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.post(&url).json(&request);
         if let Some(t) = token {
             request = request.bearer_auth(t);
@@ -155,4 +152,19 @@ pub async fn remove_local_summary(app: AppHandle, file_id: String) -> Result<(),
 
     let json = serde_json::to_string_pretty(&mappings).map_err(|e| e.to_string())?;
     fs::write(&mappings_path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_local_summaries(app: AppHandle) -> Result<(), String> {
+    let mappings_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("summaries.json");
+
+    if mappings_path.exists() {
+        fs::remove_file(&mappings_path).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
 }
