@@ -5,9 +5,11 @@ import { useSyncStatus } from "../contexts/SyncContext";
 const POLL_INTERVAL_MS = 120000; // 2 minutes
 
 export function useSyncPoller() {
-    const { setStatus, fetchUpdates } = useSyncStatus();
+    const { syncEnabled, setStatus, fetchUpdates } = useSyncStatus();
 
     useEffect(() => {
+        if (!syncEnabled) return;
+
         // Set up interval for periodic polling
         const interval = setInterval(fetchUpdates, POLL_INTERVAL_MS);
 

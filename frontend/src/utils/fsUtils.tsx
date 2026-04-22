@@ -13,7 +13,7 @@ export function getFileNodes(root: FsNode | undefined, openIds: Set<string>): Fs
     );
 }
 
-export function findNode(root: FsNode | undefined, nodeId: string): FsNode | null {
+export function findNode(root: FsNode | undefined, nodeId: string): FsNode | undefined {
     return collectAllNodes(root?.children ?? []).filter(node => node.id === nodeId)[0];
 }
 
@@ -24,6 +24,16 @@ export function findNodeInDir(root: FsNode | undefined, targetId: string, newNod
     if (!targetNode?.children || targetNode?.children.length === 0) return undefined;
 
     return targetNode.children.find((node) => node.id === newNodeId);
+}
+
+export function findFilesInDir(root: FsNode | undefined, targetId: string): FsNode[] {
+    const allNodes = collectAllNodes(root?.children ?? []);
+    const targetNode = allNodes.find((node) => node.id === targetId);
+
+    if (!targetNode?.children || targetNode?.children.length === 0) return [];
+
+    const targetChildren = collectAllNodes(targetNode.children);
+    return targetChildren.filter((node) => node.kind === "file");
 }
 
 export function findNodeShallow(root: FsNode | undefined, nodeId: string): FsNode | undefined {

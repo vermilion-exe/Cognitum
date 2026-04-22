@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useToast } from "../hooks/useToast";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { ContextMenuOption } from "../types/ContextMenuOption";
+import { ExplorerContextMenu } from "./ExplorerContextMenu";
 import { useSyncManager } from "../hooks/useSyncManager";
 
 let dragState: {
@@ -48,22 +49,25 @@ function ExplorerTree({ nodes, depthPipes = [], isRoot, }:
 }
 
 function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node: FsNode; pipes: boolean[]; isLast: boolean; isOpen: boolean; isActive: boolean; toggleOpen: (e: React.MouseEvent, node: FsNode) => void; }) {
-    const { root, setRoot, createNode } = useFileTree();
-    const { syncEnabled, setStatus } = useSyncStatus();
-    const { scheduleSync } = useSyncManager();
+    const { root, setRoot, createNode, deleteNode, renameNode } = useFileTree();
+    const { syncEnabled } = useSyncStatus();
     const [isDragging, setIsDragging] = useState(false);
+    const [newName, setNewName] = useState<string | null>(null);
+    const [isRenaming, setIsRenaming] = useState(false);
     const rowRef = useRef<HTMLDivElement>(null);
     const dragStartPos = useRef<{ x: number, y: number } | null>(null);
     const didStartDrag = useRef(false);
     const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
     const toast = useToast();
+    const { scheduleSync } = useSyncManager();
     const drag_threshold = 5;
 
     // Context Menu
 
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
+        e.stopPropagation();
         setContextMenu({ x: e.clientX, y: e.clientY });
     }
 
@@ -73,6 +77,20 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
 
     const handleNewDir = async () => {
         createNode(node.id, "Untitled", true);
+    }
+
+    const handleDeleteNode = async () => {
+        deleteNode(node.id);
+    }
+
+    const showRenameInput = () => {
+        setIsRenaming(true);
+    }
+
+    const handleRenameNode = async () => {
+        renameNode(node.id, newName!);
+        setNewName(null);
+        setIsRenaming(false);
     }
 
     const contextOptions: ContextMenuOption[] = [
@@ -90,7 +108,11 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
         {
             label: "Delete",
             danger: true,
-            onClick: 
+            onClick: async () => (await handleDeleteNode()),
+        },
+        {
+            label: "Rename",
+            onClick: () => (showRenameInput()),
         }
     ]
 
@@ -121,7 +143,9 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
         const relativeNewPath = await toRelativePath(newPath);
         if (!relativeNewPath) return;
 
-        await invoke("move_note", { oldPath: oldPath, newPath: relativeNewPath })
+        const id = crypto.randomUUID();
+        scheduleSync(`move-note-${id}`,
+            { type: "note", operation: "move", id: String(id), payload: { old_path: oldPath, new_path: relativeNewPath } });
     }
 
     const isDescendant = (parentId: string, childId: string): boolean => {
@@ -172,6 +196,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
             name: root!.name,
             kind: "dir",
             children,
+            last_modified: root!.last_modified
         });
     }
 
@@ -222,6 +247,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
 
         if (!didStartDrag.current) {
             dragStartPos.current = null;
+            if (e.button !== 0) return;
             toggleOpen(e as unknown as React.MouseEvent, node);
             return;
         }
@@ -251,6 +277,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
         <div
             ref={rowRef}
             className={`${isActive ? "active-" : ""}tree-row ${isDragging ? "bg-white/10" : ""}`}
+            onContextMenu={handleContextMenu}
             data-drop-id={node.id}
             data-drop-kind={node.kind}
             data-drag-over="false"
@@ -259,6 +286,13 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
             onPointerUp={handlePointerUp}
             style={{ touchAction: "none" }}
         >
+            {contextMenu && (
+                <ExplorerContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    options={contextOptions}
+                    onClose={() => setContextMenu(null)} />
+            )}
             {isDragging && createPortal(
                 <div className="flex items-center gap-2 min-w-0 bg-background-primary/20 text-white/20 absolute px-2 py-1 rounded-md w-80" style={{ left: dragPos.x + 12, top: dragPos.y + 12 }}>
                     {node.kind === "dir" ? (isOpen ? (<img className="w-7 h-7" src={openDirectoryIcon} />) : (<img className="w-6 h-6" src={directoryIcon} />)) : null}
@@ -281,7 +315,17 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
 
             <div className="flex items-center gap-2 min-w-0">
                 {node.kind === "dir" ? (isOpen ? (<img className="w-7 h-7" src={openDirectoryIcon} />) : (<img className="w-6 h-6" src={directoryIcon} />)) : null}
-                <span className="tree-label truncate">{node.name}</span>
+                {isRenaming ? (
+                    <input value={newName ?? ""} className="h-7 rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleRenameNode(); }} />
+                ) : (
+                    <span className="tree-label truncate">{node.name}</span>
+                )
+                }
             </div>
         </div>
     );

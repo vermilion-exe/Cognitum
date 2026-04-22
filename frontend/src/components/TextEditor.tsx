@@ -135,6 +135,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
                     if (!syncEnabled) return;
 
+                    console.log("The markdown changed");
                     if (!currentNoteRef.current && !isCreatingNoteRef.current && !isNoteLoadingRef.current) {
                         isCreatingNoteRef.current = true;
                         try {
@@ -153,10 +154,11 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
                     if (isCreatingNoteRef.current || !currentNoteRef.current) return;
 
+                    console.log("Syncing the note changes");
                     isCreatingNoteRef.current = true;
                     setStatus("syncing");
-                    scheduleSync(`note-${currentNoteRef.current?.id}`,
-                        { type: "note", id: String(currentNoteRef.current?.id), payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path } });
+                    scheduleSync(`create-note-${currentNoteRef.current?.id}`,
+                        { type: "note", operation: "create", id: String(currentNoteRef.current?.id), payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path } });
                     setCurrentNote({ ...currentNoteRef.current, text: markdown });
                     setStatus("idle");
                     isCreatingNoteRef.current = false;
@@ -190,7 +192,10 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         }, [cancelAutosave]);
 
         useEffect(() => {
-            if (!activeFileId) return;
+            if (!activeFileId) {
+                activeFileIdRef.current = null;
+                return;
+            }
 
             const previousFileId = activeFileIdRef.current;
             activeFileIdRef.current = activeFileId;

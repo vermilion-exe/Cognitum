@@ -2,13 +2,15 @@ import { invoke } from '@tauri-apps/api/core';
 import mailIcon from '../assets/mail.svg';
 import { useUser } from '../contexts/UserContext';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 
 function EmailConfirmation() {
     const [code, setCode] = useState<number | undefined>();
     const [resendTime, setResendTime] = useState(60);
     const [timerKey, setTimerKey] = useState(0);
+    const location = useLocation();
+    const { isPasswordChange, newPassword, confirmPassword } = location.state || {};
     const navigate = useNavigate();
     const { user } = useUser();
     const toast = useToast();
@@ -30,6 +32,10 @@ function EmailConfirmation() {
     }, [timerKey]);
 
     function handleReturn() {
+        if (isPasswordChange) {
+            navigate('/mainPage');
+            return;
+        }
         navigate('/');
     }
 
@@ -44,6 +50,13 @@ function EmailConfirmation() {
     const handleConfirmation = async () => {
         if (!user || !code) return;
         try {
+            console.log(isPasswordChange);
+            if (isPasswordChange) {
+                await invoke("change_password", { request: { email: user.email, email_confirm_code: code, new_password: newPassword, confirm_password: confirmPassword } });
+                navigate('/mainPage');
+                toast.success("Password changed successfully");
+                return;
+            }
             await invoke("confirm_code", { request: { email: user.email, code: code } });
             navigate('/mainPage');
             toast.success("Email confirmed successfully");

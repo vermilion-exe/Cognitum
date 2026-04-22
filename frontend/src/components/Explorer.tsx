@@ -58,7 +58,15 @@ function Explorer() {
             </div>
             {createType &&
                 <div className='flex flex-col px-2 py-1 bg-background-primary mx-1 rounded-md'>
-                    <span>Enter name for new {createType}:</span>
+                    <div className='flex items-start justify-between'>
+                        <span>Enter name for new {createType}:</span>
+                        <button
+                            className="ml-4 text-gray-400 transition hover:text-white"
+                            onClick={() => setCreateType(undefined)}
+                        >
+                            ✕
+                        </button>
+                    </div>
                     <input name="nodeName" value={nodeName} onChange={(e) => setNodeName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") handleNameSelection(); }}
                         className='h-7 rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />

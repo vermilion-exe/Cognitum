@@ -61,13 +61,13 @@ function Login() {
                     </span>
                 </label>
                 <label htmlFor='Password' className='relative'>
-                    <input type='password' id='Password' placeholder='' value={password} onChange={(e) => setPassword(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <input type='password' id='Password' placeholder='' value={password} autoComplete='off' onChange={(e) => setPassword(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
 
                     <span className='absolute inset-y-2.5 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
                         Password
                     </span>
                 </label>
-                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12' onClick={handleLogin}>Login</button>
+                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50' onClick={handleLogin}>Login</button>
             </div>
         </div>
     );

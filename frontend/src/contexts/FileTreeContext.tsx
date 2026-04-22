@@ -1,11 +1,14 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { FsNode } from "../types/FsNode";
-import { getFileNodes, toRelativePath } from "../utils/fsUtils";
+import { findFilesInDir, findNode, getFileNodes, toRelativePath } from "../utils/fsUtils";
 import { useActiveFile } from "./ActiveFileContext";
-import { useVaultLoader } from "../hooks/useVaultLoader";
 import { invoke } from "@tauri-apps/api/core";
 import { useSyncStatus } from "./SyncContext";
 import { useSyncManager } from "../hooks/useSyncManager";
+import { join } from "@tauri-apps/api/path";
+import { RequestNote } from "../types/RequestNote";
+import { CardReview } from "../types/CardReview";
+import { useVault } from "./VaultContext";
 
 interface FileTreeContextType {
     root: FsNode | undefined;
@@ -15,18 +18,18 @@ interface FileTreeContextType {
     toggleOpen: (e: React.MouseEvent, node: FsNode) => void;
     closeFile: (id: string) => void;
     createNode: (targetId: string, nodeName: string, isDirectory: boolean) => void;
+    deleteNode: (nodeId: string) => void;
+    renameNode: (nodeId: string, newName: string) => void;
 }
 
 const FileTreeContext = createContext<FileTreeContextType | undefined>(undefined);
 
 export const FileTreeProvider = ({ children }: { children: React.ReactNode }) => {
     const { activeFileId, setActiveFileId } = useActiveFile();
-    const [root, setRoot] = useState<FsNode>();
+    const { root, setRoot } = useVault();
     const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
-    const { syncEnabled, setStatus } = useSyncStatus();
+    const { syncEnabled } = useSyncStatus();
     const { scheduleSync } = useSyncManager();
-
-    useVaultLoader(setRoot);
 
     const openFileNodes = useMemo(
         () => getFileNodes(root, openIds),
@@ -64,6 +67,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
             next.delete(id);
             return next;
         });
+        console.log(activeFileId === id);
         if (activeFileId === id) setActiveFileId(undefined);
     };
 
@@ -74,10 +78,8 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
         if (syncEnabled && !isDirectory) {
             const relativePath = await toRelativePath(newPath);
             const id = crypto.randomUUID();
-            setStatus("syncing");
-            scheduleSync(`note-${id}`,
-                { type: "note", id: String(id), payload: { id: null, text: "", path: relativePath } });
-            setStatus("idle");
+            scheduleSync(`create-note-${id}`,
+                { type: "note", operation: "create", id: String(id), payload: { id: null, text: "", path: relativePath } });
         }
 
         const children = await invoke<FsNode[]>("scan_dir", {
@@ -85,22 +87,111 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
             recursive: true,
         });
 
+        setRoot({
+            id: root!.id,
+            name: root!.name,
+            kind: "dir",
+            children,
+            last_modified: root!.last_modified
+        });
+    }
+
+    const deleteNode = async (nodeId: string) => {
+        const node = findNode(root, nodeId);
+        if (!node) return;
+
+        if (node.kind === "file") {
+            await invoke("delete_file", { path: nodeId });
+            await invoke("remove_local_highlights", { fileId: nodeId }).catch(console.error);
+            await invoke("remove_local_summary", { fileId: nodeId }).catch(console.error);
+            const note = await invoke<RequestNote>("get_note_by_path", { path: node.id });
+            const queue = await invoke<Record<string, CardReview>>("load_review_queue");
+            const filtered = Object.fromEntries(
+                Object.entries(queue).filter(
+                    ([, review]) => review.flashcard.note_id !== note.id
+                )
+            );
+            await invoke("save_review_queue", { queue: filtered });
+            await invoke("remove_local_flashcards", { noteId: note.id }).catch(console.error);
+        }
+        await invoke(`delete_${node?.kind === "dir" ? "directory" : "file"}`, { path: nodeId });
+
+        if (syncEnabled) {
+            if (node?.kind === "file") {
+                const relativePath = await toRelativePath(nodeId);
+                const id = crypto.randomUUID();
+                scheduleSync(`delete-note-${id}`,
+                    { type: "note", operation: "delete", id: String(id), payload: { path: relativePath } });
+            }
+            else {
+                const files = findFilesInDir(root, node.id);
+                Promise.all(files.map(async (file) => {
+                    const relativePath = await toRelativePath(file.id);
+                    const id = crypto.randomUUID();
+                    scheduleSync(`delete-note-${id}`,
+                        { type: "note", operation: "delete", id: String(id), payload: { path: relativePath } });
+                }));
+            }
+        }
+
+        if (node.id === activeFileId) {
+            setActiveFileId(undefined);
+        }
+
+        const children = await invoke<FsNode[]>("scan_dir", {
+            path: root?.id,
+            recursive: true,
+        });
 
         setRoot({
             id: root!.id,
             name: root!.name,
             kind: "dir",
             children,
+            last_modified: root!.last_modified
         });
     }
 
-    const deleteNode = async (nodeId: string) {
+    const renameNode = async (nodeId: string, newName: string) => {
+        const node = findNode(root, nodeId);
+        if (!node) return;
 
+        const base = node.kind === "file"
+            ? node.id.slice(0, -(`${node.name}.md`.length))
+            : node.id.slice(0, -(node.name.length));
+
+        const newPath = await join(base, (newName + (node.kind === "file" ? ".md" : "")));
+        await invoke("rename", { from: node.id, to: newPath });
+
+        if (syncEnabled && node.kind === "file") {
+            const oldRelativePath = await toRelativePath(node.id);
+            const newRelativePath = await toRelativePath(newPath);
+            const id = crypto.randomUUID();
+            scheduleSync(`move-note-${id}`,
+                { type: "note", operation: "move", id: String(id), payload: { old_path: oldRelativePath, new_path: newRelativePath } });
+        }
+
+        if (node.id === activeFileId) {
+            setActiveFileId(undefined);
+        }
+
+        const children = await invoke<FsNode[]>("scan_dir", {
+            path: root?.id,
+            recursive: true,
+        });
+
+        setRoot({
+            id: root!.id,
+            name: root!.name,
+            kind: "dir",
+            children,
+            last_modified: root!.last_modified
+        });
     }
 
     return (
         <FileTreeContext.Provider
-            value={{ root, setRoot, openIds, openFileNodes, toggleOpen, closeFile, createNode }}
+            value={{ root, setRoot, openIds, openFileNodes, toggleOpen, closeFile, createNode, deleteNode, renameNode }}
         >
             {children}
         </FileTreeContext.Provider>

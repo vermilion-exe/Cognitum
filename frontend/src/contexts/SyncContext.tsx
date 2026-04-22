@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { SyncStatus } from "../types/SyncStatus";
 import { RequestNote } from "../types/RequestNote";
 import { useActiveFile } from "./ActiveFileContext";
-import { toRelativePath } from "../utils/fsUtils";
+import { collectAllNodes, toRelativePath } from "../utils/fsUtils";
 import { invoke } from "@tauri-apps/api/core";
 import { useUser } from "./UserContext";
 import { ResponseSummary } from "../types/SyncTypes";
@@ -11,6 +11,8 @@ import { RequestSyncProgress } from "../types/RequestSyncProgress";
 import { useSyncManager } from "../hooks/useSyncManager";
 import { join } from "@tauri-apps/api/path";
 import { useToast } from "../hooks/useToast";
+import { FsNode } from "../types/FsNode";
+import { useVault } from "./VaultContext";
 
 type SyncContextType = {
     status: SyncStatus;
@@ -29,7 +31,7 @@ type SyncContextType = {
 const SyncContext = createContext<SyncContextType>({
     status: "idle",
     setStatus: () => { },
-    syncEnabled: true,
+    syncEnabled: false,
     setSyncEnabled: () => { },
     currentNote: null,
     setCurrentNote: () => { },
@@ -42,8 +44,9 @@ const SyncContext = createContext<SyncContextType>({
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<SyncStatus>("idle");
-    const [syncEnabled, setSyncEnabled] = useState(true);
+    const [syncEnabled, setSyncEnabled] = useState(false);
     const [currentNote, setCurrentNote] = useState<RequestNote | null>(null);
+    const { root, setRoot } = useVault();
     const [isNoteLoading, setIsNoteLoading] = useState(false);
     const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number | null>(null);
     const { scheduleSync } = useSyncManager();
@@ -59,7 +62,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             setCurrentNote(note);
         }
         catch {
-            console.log(activeFileId!);
             const text = await invoke("read_file", { path: activeFileId! });
             const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: text, path: relativePath } });
             setCurrentNote(createdNote);
@@ -68,6 +70,25 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             setIsNoteLoading(false);
         }
     }
+
+    useEffect(() => {
+        async function loadSyncEnabled() {
+            const cfg = await invoke<{ syncEnabled?: boolean }>("load_config");
+            if (cfg.syncEnabled) {
+                setSyncEnabled(cfg.syncEnabled);
+            }
+        }
+
+        loadSyncEnabled();
+    }, []);
+
+    useEffect(() => {
+        async function saveSyncEnabled() {
+            await invoke("save_sync_enabled", { syncEnabled: syncEnabled });
+        }
+
+        saveSyncEnabled();
+    }, [syncEnabled]);
 
     useEffect(() => {
         if (!activeFileId || !syncEnabled) {
@@ -79,7 +100,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }, [activeFileId, syncEnabled]);
 
     useEffect(() => {
-        toast.info("Sync status: " + status);
+        if (status === "syncing") toast.info("Sync in progress..");
+        else if (status === "error") toast.error("Sync failed");
     }, [status]);
 
     const replayOfflineQueue = async () => {
@@ -101,12 +123,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setLastSyncTimestamp(new Date(timestamp).getTime());
 
         if (!timestamp) {
-            const progress = await invoke<RequestSyncProgress | null>("load_sync_progress");
-            if (progress) {
-                await triggerFullSync(progress);
-                await replayOfflineQueue();
+            try {
+                const progress = await invoke<RequestSyncProgress | null>("load_sync_progress");
+                if (progress) {
+                    await triggerFullSync(progress);
+                    await replayOfflineQueue();
+                }
             }
-            else {
+            catch (e) {
                 await triggerFullSync();
                 await replayOfflineQueue();
             }
@@ -128,16 +152,38 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
         try {
             const db_notes = await invoke<RequestNote[]>("get_all_notes");
-            const local_notes = await invoke<RequestNote[]>("get_local_notes");
+
+            const children = await invoke<FsNode[]>("scan_dir", {
+                path: root?.id,
+                recursive: true,
+            });
+
+            setRoot({
+                id: root!.id,
+                name: root!.name,
+                kind: "dir",
+                children,
+                last_modified: root!.last_modified
+            });
+
+            const nodes = collectAllNodes(children);
+            const nodes_with_paths = await Promise.all(
+                nodes.map(async (node) => ({
+                    node,
+                    relativePath: await toRelativePath(node.id),
+                }))
+            );
 
             await Promise.all(db_notes.map(async (note) => {
                 if (progress.completed_note_ids.includes(note.id!)) return;
 
-                const note_metadata = await invoke<RequestNote>("get_local_note", { path: note.path });
+                const matchedNode = nodes_with_paths.find(
+                    ({ relativePath }) => relativePath === note.path
+                );
                 const fullPath = await getNoteFullPath(note.path);
 
                 // If the local note is newer
-                if (note_metadata && (new Date(note_metadata.last_updated) > new Date(note.last_updated))) {
+                if (matchedNode && (new Date(matchedNode.node.last_modified) > new Date(note.last_updated))) {
                     const text = await getNoteText(note.path);
                     await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: note.last_updated } });
 
@@ -151,7 +197,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 }
                 // If the database note is newer
                 else {
-                    await invoke("create_file", { path: getNoteFullPath(note.path), contents: note.text });
+                    await invoke("create_file", { path: await getNoteFullPath(note.path), contents: note.text });
                     await invoke("save_note_metadata", { path: note.path, note: note });
 
                     const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
@@ -167,27 +213,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             }));
 
             // Add any local files not existing in the database
-            await Promise.all(local_notes.map(async (note) => {
-                if (progress.completed_note_ids.includes(note.id!)) return;
-
-                const db_exists = db_notes.some(file => file.path === note.path);
+            await Promise.all(nodes_with_paths.map(async (node_with_path) => {
+                const db_exists = db_notes.some(file => file.path === node_with_path.relativePath);
 
                 if (!db_exists) {
-                    const fullPath = getNoteFullPath(note.path);
+                    const text = await getNoteText(node_with_path.relativePath!);
+                    const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: new Date().toISOString() } });
 
-                    const text = await getNoteText(note.path);
-                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: note.last_updated } });
+                    const summary = await invoke<string>("get_local_summary", { fileId: node_with_path.node.id });
+                    await invoke("create_summary", { request: { id: null, summary: summary, note_id: createdNote.id } });
 
-                    const summary = await invoke<ResponseSummary>("get_local_summary", { noteId: note.id });
-                    await invoke("create_summary", { request: { id: summary.id, summary: summary.summary, note_id: summary.note_id } });
-
-                    const highlights = await invoke<ResponseHighlight[]>("read_highlights", { fileId: fullPath });
+                    const highlights = await invoke<ResponseHighlight[]>("read_highlights", { fileId: node_with_path.node.id });
                     await Promise.all(highlights.map(async (h) => {
                         await invoke("create_explanation", { request: { id: h.id, from: h.from, to: h.to, selected_text: h.selected_text, explanation: h.explanation, note_id: h.note_id } });
                     }));
                 }
 
-                progress.completed_note_ids.push(note.id!);
                 await invoke("save_sync_progress", { progress });
             }));
 

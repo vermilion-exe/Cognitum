@@ -38,6 +38,7 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
         scheduleSync(`highlight-${highlight.id}`,
             {
                 type: "explanation",
+                operation: "create",
                 id: String(highlight.id),
                 payload: { id: highlight.id, from: highlight?.from, to: highlight?.to, selected_text: highlight?.selected_text, explanation: highlight?.explanation, created_at: highlight?.created_at, note_id: currentNote?.id }
             });

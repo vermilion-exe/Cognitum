@@ -9,7 +9,7 @@ import { useActiveFile } from "../contexts/ActiveFileContext";
 
 const MIN_CHARS = 300;
 
-export function useSummary({ markdownRef }: { markdownRef: RefObject<string> }) {
+export function useSummary({ markdownRef, markdown }: { markdownRef: RefObject<string>; markdown: string; }) {
     const [isSummaryOpen, setIsSummaryOpen] = useState(false);
     const [isSummaryLoading, setIsSummaryLoading] = useState(false);
     const isLocalLoad = useRef(false);
@@ -22,21 +22,20 @@ export function useSummary({ markdownRef }: { markdownRef: RefObject<string> }) 
 
     // Save summary function that is called if sync is enabled
     async function saveSummary() {
+        const noteId = currentNote?.id;
         try {
-            const summary = await invoke<ResponseSummary | null>("get_summary_by_note_id", { noteId: currentNote?.id });
+            const summary = await invoke<ResponseSummary | null>("get_summary_by_note_id", { noteId: noteId });
 
             const id = summary ? summary.id : null;
             setStatus("syncing");
             scheduleSync(`summary-${id}`,
-                { type: "summary", id: String(id), payload: { id: id, summary: fullText, note_id: currentNote?.id } });
+                { type: "summary", operation: "create", id: String(id), payload: { id: id, summary: fullText, note_id: noteId } });
         }
         catch (e) {
             const uuid = crypto.randomUUID();
             setStatus("syncing");
-            console.log(uuid);
-            console.log(currentNote?.id);
             scheduleSync(`summary-${uuid}`,
-                { type: "summary", id: String(uuid), payload: { id: null, summary: fullText, note_id: currentNote?.id } });
+                { type: "summary", operation: "create", id: String(uuid), payload: { id: null, summary: fullText, note_id: noteId } });
         }
         finally {
             setStatus("idle");
@@ -54,7 +53,6 @@ export function useSummary({ markdownRef }: { markdownRef: RefObject<string> }) 
                 setDisplayedText(summary);
             }
             catch (e) {
-                console.log("No summary found.");
                 setFullText("");
                 setDisplayedText("");
                 isLocalLoad.current = false;
@@ -66,7 +64,7 @@ export function useSummary({ markdownRef }: { markdownRef: RefObject<string> }) 
 
     useEffect(() => {
         setHasEnoughChars(markdownRef.current.length >= MIN_CHARS);
-    }, [markdownRef.current]);
+    }, [markdown]);
 
     // Saves the summary if the summary text changes
     useEffect(() => {
@@ -76,7 +74,7 @@ export function useSummary({ markdownRef }: { markdownRef: RefObject<string> }) 
         }
         if (!fullText || !syncEnabled) return;
         saveSummary();
-    }, [fullText]);
+    }, [fullText, syncEnabled]);
 
     // If the summary accordion is opened, the summary request is made
     useEffect(() => {

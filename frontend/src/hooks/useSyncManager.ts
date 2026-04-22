@@ -1,14 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef } from "react";
+import { useSyncStatus } from "../contexts/SyncContext";
 
 const DEBOUNCE_MS = 2000;
 
 export function useSyncManager() {
+    const { setStatus } = useSyncStatus();
     const queue = useRef<Map<string, SyncOperation>>(new Map());
     const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
     const scheduleSync = useCallback(
         (key: string, operation: Omit<SyncOperation, "timestamp">) => {
+            setStatus("syncing");
             queue.current.set(key, { ...operation, timestamp: Date.now() });
 
             invoke("save_sync_queue", { queue: Object.fromEntries(queue.current) });
@@ -24,11 +27,13 @@ export function useSyncManager() {
                     if (!op) return;
 
                     try {
-                        await invoke(`create_${op.type}`, { request: op.payload });
+                        await invoke(`${op.operation}_${op.type}`, { request: op.payload });
                         queue.current.delete(key);
 
                         invoke("save_sync_queue", { queue: Object.fromEntries(queue.current) });
+                        setStatus("idle");
                     } catch (e) {
+                        setStatus("error");
                         console.error(`Backup failed for ${key}`, e);
                     }
 

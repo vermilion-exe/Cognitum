@@ -3,4 +3,5 @@ export type FsNode = {
     name: string;               // display name
     kind: "dir" | "file";
     children?: FsNode[];        // only for dirs (when loaded/expanded)
+    last_modified: number;
 };

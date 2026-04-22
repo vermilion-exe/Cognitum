@@ -9,6 +9,7 @@ import { useAuthErrorListener } from "./hooks/useAuthErrorListener";
 import { useSyncPoller } from "./hooks/useSyncPoller";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ToastContainer } from "react-toastify";
+import { VaultProvider } from "./contexts/VaultContext";
 
 function AppLayoutInner() {
     useAuthErrorListener();
@@ -44,11 +45,13 @@ export default function AppLayout() {
         <ToastProvider>
             <UserProvider>
                 <ActiveFileProvider>
-                    <SyncProvider>
-                        <FileTreeProvider>
-                            <AppLayoutInner />
-                        </FileTreeProvider>
-                    </SyncProvider>
+                    <VaultProvider redirectIfNoVault={true}>
+                        <SyncProvider>
+                            <FileTreeProvider>
+                                <AppLayoutInner />
+                            </FileTreeProvider>
+                        </SyncProvider>
+                    </VaultProvider>
                 </ActiveFileProvider>
             </UserProvider>
             <ToastContainer

@@ -54,14 +54,14 @@ function Register() {
             <MainHeader />
             <div className='flex flex-col gap-4 w-full max-w-md'>
                 <label htmlFor='Username' className='relative w-full'>
-                    <input type='text' id='Username' placeholder='' value={username} onChange={(e) => setUsername(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <input type='text' id='Username' placeholder='' value={username} autoComplete='off' onChange={(e) => setUsername(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
 
                     <span className='absolute inset-y-2.5 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
                         Username
                     </span>
                 </label>
                 <label htmlFor='Email' className='relative w-full'>
-                    <input type='email' id='Email' placeholder='' value={email} onChange={(e) => setEmail(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <input type='email' id='Email' placeholder='' value={email} autoComplete='off' onChange={(e) => setEmail(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
 
                     <span className='absolute inset-y-2.5 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
                         Email
@@ -74,7 +74,7 @@ function Register() {
                         Password
                     </span>
                 </label>
-                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12' onClick={handleRegister}>Login</button>
+                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50' onClick={handleRegister}>Register</button>
             </div>
         </div>
     );

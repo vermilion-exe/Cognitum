@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import type { FsNode } from "../types/FsNode";
 
-export function useVaultLoader(setRoot: (root: FsNode) => void) {
+export function useVaultLoader({ setRoot, redirectIfNoVault }: { setRoot: (root: FsNode) => void; redirectIfNoVault: boolean; }) {
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -13,7 +13,7 @@ export function useVaultLoader(setRoot: (root: FsNode) => void) {
             const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
             if (!cfg?.vaultPath) {
-                navigate("choosePath");
+                if (redirectIfNoVault) navigate("choosePath");
                 return;
             }
 
@@ -31,6 +31,7 @@ export function useVaultLoader(setRoot: (root: FsNode) => void) {
                     cfg.vaultPath,
                 kind: "dir",
                 children,
+                last_modified: Date.now()
             });
         })();
 

@@ -1,13 +1,33 @@
 import { ResponseFlashcard } from "../types/ResponseFlashcard";
 import { CardReview } from '../types/CardReview';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSyncStatus } from "../contexts/SyncContext";
 
-function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen }: { flashcards: ResponseFlashcard[]; reviewCard: (key: bigint, review: CardReview) => void; setIsFlashcardOverlayOpen: (isOpen: boolean) => void; }) {
+function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen, flashcardsLoading, replaceStaleFlashcards, deleteFlashcard, replaceFlashcard }:
+    {
+        flashcards: ResponseFlashcard[];
+        reviewCard: (key: bigint, review: CardReview) => void;
+        setIsFlashcardOverlayOpen: (isOpen: boolean) => void;
+        flashcardsLoading: boolean;
+        replaceStaleFlashcards: () => void;
+        deleteFlashcard: (flashcardId: bigint) => void;
+        replaceFlashcard: (flashcardId: bigint) => void;
+    }) {
     const today = new Date().toISOString().split("T")[0];
     const [flashcardCounter, setFlashcardCounter] = useState(0);
     const [isAnswerShown, setIsAnswerShown] = useState(false);
+    const [hasStaleFlashcards, setHasStaleFlashcards] = useState(false);
+    const { syncEnabled } = useSyncStatus();
 
     const [queue, setQueue] = useState<ResponseFlashcard[]>(() => flashcards.filter((f) => f.next_review <= today));
+
+    useEffect(() => {
+        if (!flashcards) return;
+        if (flashcards.find((flashcard) => flashcard.is_stale)) {
+            setHasStaleFlashcards(true);
+        }
+        setQueue(flashcards.filter((f) => f.next_review <= today));
+    }, [flashcards]);
 
     const card = queue[flashcardCounter];
 
@@ -32,6 +52,12 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen 
                 <div className="flex items-start justify-between border-b border-background-primary p-6 pb-4">
                     <div>
                         <h2 className="text-lg font-semibold text-white">Flashcard Revision</h2>
+                        {hasStaleFlashcards && (
+                            <div className="bg-yellow-300/30 border border-yellow-300 p-1 rounded-md">
+                                Your note has some stale flashcards due to content change.
+                                <button className="text-blue-600 underline hover:text-blue-600/50 cursor-pointer" onClick={() => { setHasStaleFlashcards(false); replaceStaleFlashcards(); }}>Press here to replace them.</button>
+                            </div>
+                        )}
                     </div>
                     <button
                         className="ml-4 text-gray-400 transition hover:text-white"
@@ -69,20 +95,26 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen 
                                 (<div className='flex justify-center w-full'>
                                     <button onClick={() => setIsAnswerShown(true)} className='rounded-md border border-gray-400 bg-gray-400 hover:bg-gray-600 px-2 py-1'>Reveal Answer</button>
                                 </div>)}</>)
-                        : (<div>Revision for this note is complete!</div>)}
+                        : (<div>{syncEnabled ? (flashcardsLoading ? (
+                            <div className='flex items-center gap-2'>
+                                <span className="animate-spin">⏳</span>
+                                <span>Flashcards are loading..</span>
+                            </div>
+                        ) : "Revision for this note is complete!") :
+                            "Enable synchronisation for flashcard revision in settings first"}</div>)}
                 </div>
 
                 {/* Footer Actions */}
                 <div className="flex justify-end gap-3 border-t border-background-primary p-6 pt-4">
                     <button
                         className="rounded-lg bg-button-primary px-4 py-2 text-sm text-white transition hover:bg-button-primary/50"
-                    //onClick={() => onRegenerate(activeHighlight.id)}
+                        onClick={() => replaceFlashcard(card.id)}
                     >
                         Regenerate
                     </button>
                     <button
                         className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition hover:bg-red-700"
-                    //onClick={() => onDelete(activeHighlight.id)}
+                        onClick={() => deleteFlashcard(card.id)}
                     >
                         Delete
                     </button>
