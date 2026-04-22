@@ -32,16 +32,18 @@ public class Flashcard {
     private FlashcardType type;
 
     @Column(name = "is_retired")
+    @Builder.Default
     private Boolean isRetired = false;
 
     @Column(name= "is_stale")
+    @Builder.Default
     private Boolean isStale = false;
 
     @Column(name = "easiness_factor")
     @Builder.Default
     private Double easinessFactor = 2.5;
 
-    @Column
+    @Column(name = "review_interval")
     @Builder.Default
     private Integer interval = 1; // in days
 

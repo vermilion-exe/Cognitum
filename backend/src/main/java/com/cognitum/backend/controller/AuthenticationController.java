@@ -1,9 +1,6 @@
 package com.cognitum.backend.controller;
 
-import com.cognitum.backend.dto.request.RequestConfirmation;
-import com.cognitum.backend.dto.request.RequestRefreshToken;
-import com.cognitum.backend.dto.request.RequestRegister;
-import com.cognitum.backend.dto.request.RequestAuthentication;
+import com.cognitum.backend.dto.request.*;
 import com.cognitum.backend.dto.response.ResponseAuthentication;
 import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUserInfo;
@@ -55,10 +52,10 @@ public class AuthenticationController {
         return service.emailSendCode(email, isChangePassword);
     }
 
-//    @PostMapping("/change-password")
-//    public ResponseEntity<Boolean> changePassword(@RequestBody RequestChangePassword changePassword) {
-//        return service.changePassword(changePassword);
-//    }
+    @PostMapping("/change-password")
+    public ResponseEntity<Boolean> changePassword(@RequestBody RequestChangePassword changePassword) {
+        return service.changePassword(changePassword);
+    }
 //
 //    @PostMapping("/change-username")
 //    public ResponseEntity<Boolean> changeUsername(@RequestHeader(value = "Authorization") String token,
@@ -72,8 +69,8 @@ public class AuthenticationController {
     }
 
     @DeleteMapping
-    public void removeUser(@RequestHeader(value = "Authorization") String token) {
-        service.removeUser(token);
+    public ResponseOperation removeUser(@RequestHeader(value = "Authorization") String token) {
+        return service.removeUser(token);
     }
 
 }

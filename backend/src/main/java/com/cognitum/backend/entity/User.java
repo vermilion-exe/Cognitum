@@ -20,7 +20,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Getter
 @Setter
-@Table(name = "User", schema = "cognitum_data")
+@Table(name = "Users", schema = "cognitum_data")
 public class User implements UserDetails {
 
     @Id

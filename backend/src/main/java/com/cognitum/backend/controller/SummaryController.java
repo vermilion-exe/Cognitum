@@ -27,7 +27,7 @@ public class SummaryController {
     }
 
     @PostMapping
-    public ResponseOperation createSummary(@RequestHeader("Authorization") String token,
+    public ResponseSummary createSummary(@RequestHeader("Authorization") String token,
                                            @RequestBody ResponseSummary request) {
         return summaryService.createSummary(token, request);
     }

@@ -23,7 +23,7 @@ public class CardReview {
     @Builder.Default
     private Double easinessFactor = 2.5;
 
-    @Column
+    @Column(name = "review_interval")
     @Builder.Default
     private Integer interval = 1; // in days
 

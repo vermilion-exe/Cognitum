@@ -8,6 +8,6 @@ public interface SummaryService {
 
     ResponseSummary summarize(RequestSummary requestSummary);
     ResponseSummary getSummaryByNoteId(String token, Long noteId);
-    ResponseOperation createSummary(String token, ResponseSummary request);
+    ResponseSummary createSummary(String token, ResponseSummary request);
 
 }

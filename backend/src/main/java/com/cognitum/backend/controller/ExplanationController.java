@@ -29,7 +29,7 @@ public class ExplanationController {
     }
 
      @PostMapping
-    public ResponseOperation createExplanation(@RequestHeader("Authorization") String token,
+    public RequestHighlight createExplanation(@RequestHeader("Authorization") String token,
                                                @RequestBody RequestHighlight request) {
             return explanationService.createExplanation(token, request);
      }

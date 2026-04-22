@@ -5,12 +5,13 @@ import com.cognitum.backend.dto.request.RequestMessage;
 import com.cognitum.backend.dto.response.*;
 import com.cognitum.backend.entity.Flashcard;
 import com.cognitum.backend.entity.Note;
+import com.cognitum.backend.exception.NotFoundException;
+import com.cognitum.backend.exception.UnauthorizedException;
 import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.FlashcardRepository;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.service.JwtService;
 import com.cognitum.backend.service.QuestionService;
-import com.cognitum.backend.service.SM2Service;
 import com.cognitum.backend.web.NvidiaWebClient;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,6 @@ public class QuestionServiceImpl implements QuestionService {
     private final NoteRepository noteRepository;
     private final FlashcardRepository flashcardRepository;
     private final JwtService jwtService;
-    private final SM2Service sm2Service;
 
     private ResponseCompletion requestQuestions(Long noteId, Integer count) {
         RequestCompletion request = new RequestCompletion();
@@ -48,7 +48,7 @@ public class QuestionServiceImpl implements QuestionService {
             - Keep answers concise (1-3 sentences)
             - Return ONLY a raw JSON array, no markdown, no explanation
         
-            Format:
+            Ensure that the response is in this EXACT format:
             [
               {
                 "question": "...",
@@ -59,7 +59,7 @@ public class QuestionServiceImpl implements QuestionService {
             """, count);
 
         String userPrompt = "Generate flashcards for the following note:\n\n" + noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId))
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId))
                 .getText();
 
         request.setMessages(List.of(
@@ -75,10 +75,10 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public List<Long> checkFlashcardRelevance(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
 
         List<Flashcard> flashcards = flashcardRepository.findAllByNoteIdAndIsRetiredFalse(noteId);
@@ -105,7 +105,7 @@ public class QuestionServiceImpl implements QuestionService {
             - Return ONLY a raw JSON array of IDs that are irrelevant, no markdown, no explanation
             - If all cards are relevant, return an empty array: []
 
-            Format:
+            Ensure the response is in this EXACT format:
             [1, 4, 7]
             """;
 
@@ -127,6 +127,9 @@ public class QuestionServiceImpl implements QuestionService {
         request.setStream(false);
 
         ResponseCompletion response = webClient.requestCompletion(request);
+        if (response.getChoices() == null)
+            return List.of();
+
         String content = response.getChoices().get(0).getMessage().getContent();
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -142,15 +145,18 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public List<ResponseFlashcard> generateFlashcards(String token, Long noteId, Integer count) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
 
 //        flashcardRepository.deleteAllByNoteId(noteId);
 
         ResponseCompletion response = requestQuestions(noteId, count);
+        if (response.getChoices() == null)
+            return List.of();
+
         String content = response.getChoices().get(0).getMessage().getContent();
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -187,17 +193,17 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public ResponseOperation updateStaleFlashcards(String token, Long noteId, List<Long> flashcardIds) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
 
         for (Long fid : flashcardIds) {
             Flashcard flashcard = flashcardRepository.findById(fid)
-                    .orElseThrow(() -> new RuntimeException("Flashcard not found with id: " + fid));
+                    .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + fid));
             if (!flashcard.getNote().getUserId().equals(user.getId())) {
-                throw new RuntimeException("Unauthorized access to flashcard with id: " + fid);
+                throw new UnauthorizedException("Unauthorized access to flashcard with id: " + fid);
             }
 
             flashcard.setIsStale(true);
@@ -233,9 +239,9 @@ public class QuestionServiceImpl implements QuestionService {
     public ResponseOperation submitReview(String token, ResponseFlashcard review) {
         ResponseUser user = jwtService.getTokenInfo(token);
         Flashcard flashcard = flashcardRepository.findById(review.getId())
-                .orElseThrow(() -> new RuntimeException("Flashcard not found with id: " + review.getId()));
+                .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + review.getId()));
         if (!flashcard.getNote().getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to flashcard with id: " + review.getId());
+            throw new UnauthorizedException("Unauthorized access to flashcard with id: " + review.getId());
         }
 
         flashcard.setEasinessFactor(review.getEasinessFactor());
@@ -253,10 +259,10 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public List<ResponseFlashcard> getFlashcardsByNoteId(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
         List<Flashcard> flashcards = flashcardRepository.findAllByNoteId(noteId);
         return flashcards.stream().map(fc -> new ResponseFlashcard(
@@ -278,10 +284,10 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public ResponseOperation deleteStaleFlashcards(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
         List<Flashcard> staleFlashcards = flashcardRepository.findAllByNoteId(noteId).stream()
                 .filter(Flashcard::getIsStale)
@@ -294,10 +300,10 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public ResponseOperation deleteAllFlashcardsByNoteId(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
         flashcardRepository.deleteAllByNoteId(noteId);
 
@@ -307,10 +313,10 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public ResponseOperation deleteFlashcard(String token, Long flashcardId) {
         Flashcard flashcard = flashcardRepository.findById(flashcardId)
-                .orElseThrow(() -> new RuntimeException("Flashcard not found with id: " + flashcardId));
+                .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + flashcardId));
         ResponseUser user = jwtService.getTokenInfo(token);
         if (!flashcard.getNote().getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access to flashcard with id: " + flashcardId);
+            throw new UnauthorizedException("Unauthorized access to flashcard with id: " + flashcardId);
         }
         flashcardRepository.delete(flashcard);
 

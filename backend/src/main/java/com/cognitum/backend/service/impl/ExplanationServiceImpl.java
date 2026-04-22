@@ -8,6 +8,8 @@ import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.entity.Explanation;
 import com.cognitum.backend.entity.Note;
+import com.cognitum.backend.exception.NotFoundException;
+import com.cognitum.backend.exception.UnauthorizedException;
 import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.ExplanationRepository;
 import com.cognitum.backend.repository.NoteRepository;
@@ -45,12 +47,12 @@ public class ExplanationServiceImpl implements ExplanationService {
     }
 
     @Override
-    public ResponseOperation createExplanation(String token, RequestHighlight request) {
+    public RequestHighlight createExplanation(String token, RequestHighlight request) {
         ResponseUser user = jwtService.getTokenInfo(token);
         Note note = noteRepository.findById(request.getNoteId())
                 .orElseThrow(() -> new RuntimeException("Note not found with id: " + request.getNoteId()));
         if(!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized to update explanation with id: " + request.getId());
+            throw new UnauthorizedException("Unauthorized to update explanation with id: " + request.getId());
         }
 
         Explanation explanation = new Explanation();
@@ -63,19 +65,28 @@ public class ExplanationServiceImpl implements ExplanationService {
         explanation.setCreatedAt(request.getCreatedAt());
         explanation.setNote(note);
 
-        explanationRepository.save(explanation);
+        Explanation savedExplanation = explanationRepository.save(explanation);
 
-        return new ResponseOperation(true);
+        RequestHighlight requestHighlight = new RequestHighlight();
+        requestHighlight.setId(savedExplanation.getId());
+        requestHighlight.setSelectedText(savedExplanation.getSelectedText());
+        requestHighlight.setExplanation(savedExplanation.getExplanation());
+        requestHighlight.setFrom(savedExplanation.getFrom());
+        requestHighlight.setTo(savedExplanation.getTo());
+        requestHighlight.setCreatedAt(savedExplanation.getCreatedAt());
+        requestHighlight.setNoteId(savedExplanation.getNote().getId());
+
+        return requestHighlight;
     }
 
     @Override
     public RequestHighlight getExplanationById(String token, UUID id) {
         Explanation explanation = explanationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Explanation not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Explanation not found with id: " + id));
 
         ResponseUser user = jwtService.getTokenInfo(token);
         if(!explanation.getNote().getUserId().equals(user.getId()) ) {
-            throw new RuntimeException("Unauthorized to access explanation with id: " + id);
+            throw new UnauthorizedException("Unauthorized to access explanation with id: " + id);
         }
 
         RequestHighlight requestHighlight = new RequestHighlight();
@@ -92,11 +103,11 @@ public class ExplanationServiceImpl implements ExplanationService {
     @Override
     public List<RequestHighlight> getExplanationsByNoteId(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found with id: " + noteId));
+                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
 
         ResponseUser user = jwtService.getTokenInfo(token);
         if(!note.getUserId().equals(user.getId()) ) {
-            throw new RuntimeException("Unauthorized to access explanations for note with id: " + noteId);
+            throw new UnauthorizedException("Unauthorized to access explanations for note with id: " + noteId);
         }
 
         return note.getExplanations().stream().map(explanation -> {
@@ -114,11 +125,11 @@ public class ExplanationServiceImpl implements ExplanationService {
     @Override
     public ResponseOperation deleteExplanation(String token, UUID id) {
         Explanation explanation = explanationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Explanation not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Explanation not found with id: " + id));
 
         ResponseUser user = jwtService.getTokenInfo(token);
         if(!explanation.getNote().getUserId().equals(user.getId()) ) {
-            throw new RuntimeException("Unauthorized to delete explanation with id: " + id);
+            throw new UnauthorizedException("Unauthorized to delete explanation with id: " + id);
         }
 
         explanationRepository.delete(explanation);

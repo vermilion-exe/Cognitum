@@ -10,7 +10,7 @@ import java.util.UUID;
 public interface ExplanationService {
 
     ResponseCompletion requestExplanation(String text);
-    ResponseOperation createExplanation(String token, RequestHighlight request);
+    RequestHighlight createExplanation(String token, RequestHighlight request);
     RequestHighlight getExplanationById(String token, UUID id);
     List<RequestHighlight> getExplanationsByNoteId(String token, Long noteId);
     ResponseOperation deleteExplanation(String token, UUID id);

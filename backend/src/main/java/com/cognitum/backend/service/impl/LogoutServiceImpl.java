@@ -1,6 +1,7 @@
 package com.cognitum.backend.service.impl;
 
 import com.cognitum.backend.dto.response.ResponseOperation;
+import com.cognitum.backend.exception.UnauthorizedException;
 import com.cognitum.backend.repository.TokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,12 +30,22 @@ public class LogoutServiceImpl implements LogoutHandler {
         token = authHeader.substring(7);
         var storedToken = tokenRepository.findByToken(token)
                 .orElse(null);
-        if (storedToken != null) {
-            storedToken.setExpired(true);
-            storedToken.setRevoked(true);
-            tokenRepository.save(storedToken);
-            SecurityContextHolder.clearContext();
+
+        if (storedToken == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            try {
+                new ObjectMapper().writeValue(response.getOutputStream(), new ResponseOperation(false));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return;
         }
+
+        storedToken.setExpired(true);
+        storedToken.setRevoked(true);
+        tokenRepository.save(storedToken);
+        SecurityContextHolder.clearContext();
+
         response.setContentType("application/json");
         response.setStatus(HttpServletResponse.SC_OK);
         try {
