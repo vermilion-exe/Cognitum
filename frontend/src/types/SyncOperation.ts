@@ -1,4 +1,4 @@
-type SyncOperation = {
+export type SyncOperation = {
     type: "note" | "explanation" | "summary" | "question";
     operation: "create" | "delete" | "move";
     id: string;

@@ -5,14 +5,16 @@ import { useActiveFile } from "./ActiveFileContext";
 import { collectAllNodes, toRelativePath } from "../utils/fsUtils";
 import { invoke } from "@tauri-apps/api/core";
 import { useUser } from "./UserContext";
-import { ResponseSummary } from "../types/SyncTypes";
+import { ResponseSummary } from "../types/ResponseSummary";
 import { ResponseHighlight } from "../types/ResponseHighlight";
 import { RequestSyncProgress } from "../types/RequestSyncProgress";
+import { SyncOperation } from "../types/SyncOperation";
 import { useSyncManager } from "../hooks/useSyncManager";
 import { join } from "@tauri-apps/api/path";
 import { useToast } from "../hooks/useToast";
 import { FsNode } from "../types/FsNode";
 import { useVault } from "./VaultContext";
+import { ResponseFlashcard } from "../types/ResponseFlashcard";
 
 type SyncContextType = {
     status: SyncStatus;
@@ -73,6 +75,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         async function loadSyncEnabled() {
+            if (!user) return;
             const cfg = await invoke<{ syncEnabled?: boolean }>("load_config");
             if (cfg.syncEnabled) {
                 setSyncEnabled(cfg.syncEnabled);
@@ -104,6 +107,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         else if (status === "error") toast.error("Sync failed");
     }, [status]);
 
+    const updateSyncEnabled = async (enabled: boolean) => {
+        if (!user) return;
+        setSyncEnabled(enabled);
+        if (!enabled) await invoke("delete_sync_data");
+    }
+
     const replayOfflineQueue = async () => {
         invoke<Record<string, SyncOperation>>("load_sync_queue")
             .then((saved) => {
@@ -115,6 +124,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     useEffect(() => {
+        if (!lastSyncTimestamp || lastSyncTimestamp === null) return;
         invoke("save_sync_timestamp", { timestamp: new Date(lastSyncTimestamp!).toISOString() });
     }, [lastSyncTimestamp]);
 
@@ -184,21 +194,72 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
                 // If the local note is newer
                 if (matchedNode && (new Date(matchedNode.node.last_modified) > new Date(note.last_updated))) {
+                    // Create the note in DB
                     const text = await getNoteText(note.path);
-                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: note.last_updated } });
+                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: new Date(matchedNode.node.last_modified).toISOString() } });
 
-                    const summary = await invoke<ResponseSummary>("get_local_summary", { noteId: note.id });
-                    await invoke("create_summary", { request: { id: summary.id, summary: summary.summary, note_id: summary.note_id } });
+                    // Push the local summary, if exists
+                    const summary = await invoke<ResponseSummary | null>("get_local_summary", { fileId: matchedNode.node.id });
+                    if (summary !== null) {
+                        await invoke("create_summary", { request: { id: summary.id, summary: summary.summary, note_id: note.id } });
+                        // Ensure local summary points to correct note id
+                        if (summary.note_id !== note.id) {
+                            summary.note_id = note.id;
+                            await invoke("save_summary", { summary: summary });
+                        }
 
-                    const highlights = await invoke<ResponseHighlight[]>("read_highlights", { fileId: fullPath });
-                    await Promise.all(highlights.map(async (h) => {
-                        await invoke("create_explanation", { request: { id: h.id, from: h.from, to: h.to, selected_text: h.selected_text, explanation: h.explanation, note_id: h.note_id } });
-                    }));
+                    }
+
+                    // Push local highlights, if exist
+                    const highlights = await invoke<ResponseHighlight[] | null>("read_highlights", { fileId: fullPath });
+                    if (highlights !== null && highlights.length !== 0) {
+                        try {
+                            await invoke("delete_explanations_except", { ids: highlights.map((h) => h.id) });
+                        }
+                        catch (e) {
+                            // If explanations do not exist in DB, delete all
+                            await invoke("delete_all_note_explanations", { noteId: note.id });
+                        }
+
+                        // Create the highlights in DB
+                        await Promise.all(highlights.map(async (h) => {
+                            await invoke("create_explanation", { request: { ...h, note_id: note.id } });
+                        }));
+
+                        // Ensure the highlights point to correct note id
+                        const local_note_id = highlights[0].note_id;
+                        if (local_note_id !== note.id) {
+                            await invoke("save_highlights", { fileId: matchedNode.node.id, highlights: highlights.map((h) => ({ ...h, note_id: note.id })) });
+                        }
+                    }
+                    else {
+                        await invoke("delete_all_note_explanations", { noteId: note.id });
+                    }
+
+                    // Push local flashcards, if exist
+                    const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { noteId: note.id });
+                    if (flashcards !== null && flashcards.length !== 0) {
+                        try {
+                            await invoke("delete_flashcards_except", { ids: flashcards.map((f) => f.id) });
+                            await Promise.all(flashcards.map(async (f) => {
+                                await invoke("create_flashcard", { request: { ...f, id: null, note_id: note.id } });
+                            }));
+                        }
+                        catch (e) {
+                            // If flashcards do not exist in DB, delete all
+                            await invoke("delete_all_flashcards_by_note_id", { noteId: note.id });
+                            await Promise.all(flashcards.map(async (f) => {
+                                await invoke("create_flashcard", { request: { ...f, note_id: note.id } });
+                            }));
+                        }
+                    }
+                    else {
+                        await invoke("delete_all_flashcards_by_note_id", { noteId: note.id });
+                    }
                 }
                 // If the database note is newer
                 else {
                     await invoke("create_file", { path: await getNoteFullPath(note.path), contents: note.text });
-                    await invoke("save_note_metadata", { path: note.path, note: note });
 
                     const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
                     await invoke("save_summary", { summary: summary });
@@ -206,6 +267,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                     const highlights = await invoke<ResponseHighlight[]>("get_explanations_by_note_id", { noteId: note.id });
                     await invoke("remove_local_highlights", { fileId: fullPath });
                     await invoke("save_highlights", { fileId: fullPath, highlights });
+
+                    const flashcards = await invoke<ResponseFlashcard[]>("get_flashcards_by_note_id", { noteId: note.id });
+                    await invoke("remove_local_flashcards", { noteId: note.id });
+                    await invoke("save_local_flashcards", { noteId: note.id, flashcards: flashcards });
                 }
 
                 progress.completed_note_ids.push(note.id!);
@@ -218,15 +283,38 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
                 if (!db_exists) {
                     const text = await getNoteText(node_with_path.relativePath!);
-                    const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: new Date().toISOString() } });
+                    const createdNote = await invoke<RequestNote>("create_note",
+                        { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: new Date(node_with_path.node.last_modified).toISOString() } });
 
-                    const summary = await invoke<string>("get_local_summary", { fileId: node_with_path.node.id });
-                    await invoke("create_summary", { request: { id: null, summary: summary, note_id: createdNote.id } });
+                    // Push the local summary, if exists
+                    const summary = await invoke<ResponseSummary | null>("get_local_summary", { fileId: node_with_path.node.id });
+                    if (summary !== null)
+                        await invoke("create_summary", { request: { id: summary.id, summary: summary.summary, note_id: createdNote.id! } });
 
-                    const highlights = await invoke<ResponseHighlight[]>("read_highlights", { fileId: node_with_path.node.id });
-                    await Promise.all(highlights.map(async (h) => {
-                        await invoke("create_explanation", { request: { id: h.id, from: h.from, to: h.to, selected_text: h.selected_text, explanation: h.explanation, note_id: h.note_id } });
-                    }));
+                    // Push local highlights, if exist
+                    const highlights = await invoke<ResponseHighlight[] | null>("read_highlights", { fileId: node_with_path.node.id });
+                    if (highlights !== null && highlights.length !== 0) {
+                        // Create the highlights in DB
+                        await Promise.all(highlights.map(async (h) => {
+                            await invoke("create_explanation", { request: { ...h, note_id: createdNote.id! } });
+                        }));
+
+                        // Ensure the highlights point to correct note id
+                        const local_note_id = highlights[0].note_id;
+                        if (local_note_id !== createdNote.id) {
+                            await invoke("save_highlights", { fileId: node_with_path.node.id, highlights: highlights.map((h) => ({ ...h, note_id: createdNote.id! })) });
+                        }
+                    }
+
+                    // Push local flashcards, if exist
+                    const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { noteId: createdNote.id! });
+                    if (flashcards !== null && flashcards.length !== 0) {
+                        await Promise.all(flashcards.map(async (f) => {
+                            await invoke("create_flashcard", { request: { ...f, id: null, note_id: createdNote.id! } });
+                        }));
+                    }
+
+                    progress.completed_note_ids.push(createdNote.id!);
                 }
 
                 await invoke("save_sync_progress", { progress });
@@ -242,12 +330,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const fetchUpdates = async () => {
+        if (!user) return;
+        if (!lastSyncTimestamp || lastSyncTimestamp === null || lastSyncTimestamp === 0) return;
         setStatus("syncing");
 
         try {
-            const since = lastSyncTimestamp === 0
-                ? new Date().toISOString()
-                : new Date(lastSyncTimestamp!).toISOString();
+            const since = new Date(lastSyncTimestamp!).toISOString();
             const new_notes = await invoke<RequestNote[]>("get_notes_since", { since: since });
 
             await Promise.all(new_notes.map(async (note) => {
@@ -300,7 +388,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             status,
             setStatus,
             syncEnabled,
-            setSyncEnabled,
+            setSyncEnabled: updateSyncEnabled,
             currentNote,
             setCurrentNote,
             isNoteLoading,
