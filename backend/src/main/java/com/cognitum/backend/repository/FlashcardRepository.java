@@ -23,6 +23,10 @@ public interface FlashcardRepository extends JpaRepository<Flashcard, Long> {
     @Query("UPDATE Flashcard f SET f.isStale = true WHERE f.id IN :staleIds")
     void markStaleByIds(List<Long> staleIds);
 
+    @Modifying
+    @Query("DELETE FROM Flashcard f WHERE f.id NOT IN :ids")
+    void deleteAllExcept(List<Long> ids);
+
     @Query("SELECT f FROM Flashcard f " +
             "WHERE f.note.userId = :userId " +
             "AND f.nextReview <= :date " +

@@ -8,6 +8,7 @@ import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.entity.Explanation;
 import com.cognitum.backend.entity.Note;
+import com.cognitum.backend.exception.BadRequestException;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.UnauthorizedException;
 import com.cognitum.backend.properties.NvidiaProperties;
@@ -16,11 +17,14 @@ import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.service.ExplanationService;
 import com.cognitum.backend.service.JwtService;
 import com.cognitum.backend.web.NvidiaWebClient;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -134,6 +138,47 @@ public class ExplanationServiceImpl implements ExplanationService {
 
         explanationRepository.delete(explanation);
 
+        return new ResponseOperation(true);
+    }
+
+    @Override
+    public ResponseOperation deleteAllNoteExplanations(String token, Long noteId) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new NotFoundException("Note not found"));
+
+        ResponseUser user = jwtService.getTokenInfo(token);
+        if(!note.getUserId().equals(user.getId()) ) {
+            throw new UnauthorizedException("Unauthorized to delete explanation with id: " + note.getId());
+        }
+
+        explanationRepository.deleteAllByNoteId(noteId);
+        return new ResponseOperation(true);
+    }
+
+    @Transactional
+    @Override
+    public ResponseOperation deleteExplanationsExcept(String token, List<UUID> ids) {
+        List<Explanation> explanations = explanationRepository.findAllById(ids);
+
+        if (explanations.size() != ids.size()) {
+            throw new NotFoundException("Some explanation IDs do not exist");
+        }
+
+        Set<Long> noteIds = explanations.stream()
+                .map(Explanation::getNote)
+                .map(Note::getId)
+                .collect(Collectors.toSet());
+
+        if (noteIds.size() != 1)
+            throw new BadRequestException("The explanations don't belong to the same note");
+
+        ResponseUser user = jwtService.getTokenInfo(token);
+        Note note = explanations.get(0).getNote();
+        if(!note.getUserId().equals(user.getId()) ) {
+            throw new UnauthorizedException("Unauthorized to delete explanations of note with id: " + note.getId());
+        }
+
+        explanationRepository.deleteAllExcept(ids);
         return new ResponseOperation(true);
     }
 

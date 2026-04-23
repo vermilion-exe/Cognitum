@@ -40,4 +40,14 @@ public class ExplanationController {
          return explanationService.deleteExplanation(token, id);
      }
 
+     @DeleteMapping("/note")
+     public ResponseOperation deleteAllNoteExplanations(@RequestHeader("Authorization") String token, @RequestParam Long noteId) {
+        return explanationService.deleteAllNoteExplanations(token, noteId);
+     }
+
+     @DeleteMapping("/except")
+    public ResponseOperation deleteExplanationsExcept(@RequestHeader("Authorization") String token, @RequestParam List<UUID> ids) {
+        return explanationService.deleteExplanationsExcept(token, ids);
+     }
+
 }

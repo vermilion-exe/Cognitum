@@ -5,6 +5,7 @@ import com.cognitum.backend.dto.request.RequestMessage;
 import com.cognitum.backend.dto.response.*;
 import com.cognitum.backend.entity.Flashcard;
 import com.cognitum.backend.entity.Note;
+import com.cognitum.backend.exception.BadRequestException;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.UnauthorizedException;
 import com.cognitum.backend.properties.NvidiaProperties;
@@ -236,6 +237,41 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
+    public ResponseOperation createFlashcard(String token, ResponseFlashcard request) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+        Flashcard oldFlashcard = flashcardRepository.findById(request.getId())
+                .orElse(null);
+        if (oldFlashcard != null && !oldFlashcard.getNote().getUserId().equals(user.getId())) {
+            throw new UnauthorizedException("Unauthorized access to flashcard with id: " + request.getId());
+        }
+
+        Flashcard flashcard = getFlashcard(request);
+
+        flashcardRepository.save(flashcard);
+        return new ResponseOperation(true);
+    }
+
+    private Flashcard getFlashcard(ResponseFlashcard request) {
+        Flashcard flashcard = new Flashcard();
+        flashcard.setId(request.getId());
+        Note note = noteRepository.findById(request.getNoteId())
+                        .orElseThrow(() -> new NotFoundException("Note not found"));
+        flashcard.setNote(note);
+        flashcard.setQuestion(request.getQuestion());
+        flashcard.setAnswer(request.getAnswer());
+        flashcard.setType(request.getType());
+        flashcard.setIsRetired(request.getIsRetired());
+        flashcard.setIsStale(request.getIsStale());
+        flashcard.setEasinessFactor(request.getEasinessFactor());
+        flashcard.setIsRetired(request.getIsRetired());
+        flashcard.setInterval(request.getInterval());
+        flashcard.setRepetitions(request.getRepetitions());
+        flashcard.setNextReview(request.getNextReview());
+        flashcard.setLastReviewed(request.getLastReviewed());
+        return flashcard;
+    }
+
+    @Override
     public ResponseOperation submitReview(String token, ResponseFlashcard review) {
         ResponseUser user = jwtService.getTokenInfo(token);
         Flashcard flashcard = flashcardRepository.findById(review.getId())
@@ -306,6 +342,35 @@ public class QuestionServiceImpl implements QuestionService {
             throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
         flashcardRepository.deleteAllByNoteId(noteId);
+
+        return new ResponseOperation(true);
+    }
+
+    @Transactional
+    @Override
+    public ResponseOperation deleteFlashcardsExcept(String token, List<Long> flashcardIds) {
+        List<Flashcard> flashcards = flashcardRepository.findAllById(flashcardIds);
+
+        if (flashcards.size() != flashcardIds.size()) {
+            throw new NotFoundException("One or more flashcards not found for the provided IDs");
+        }
+
+        List<Long> noteIds = flashcards.stream()
+                .map(fc -> fc.getNote().getId())
+                .distinct()
+                .toList();
+
+        if (noteIds.size() != 1) {
+            throw new BadRequestException("Provided flashcards do not belong to the same note");
+        }
+
+        ResponseUser user = jwtService.getTokenInfo(token);
+        Note note = flashcards.get(0).getNote();
+        if (!note.getUserId().equals(user.getId())) {
+            throw new UnauthorizedException("Unauthorized access to flashcards of note with id: " + note.getId());
+        }
+
+        flashcardRepository.deleteAllExcept(flashcardIds);
 
         return new ResponseOperation(true);
     }

@@ -14,5 +14,7 @@ public interface ExplanationService {
     RequestHighlight getExplanationById(String token, UUID id);
     List<RequestHighlight> getExplanationsByNoteId(String token, Long noteId);
     ResponseOperation deleteExplanation(String token, UUID id);
+    ResponseOperation deleteAllNoteExplanations(String token, Long noteId);
+    ResponseOperation deleteExplanationsExcept(String token, List<UUID> ids);
 
 }

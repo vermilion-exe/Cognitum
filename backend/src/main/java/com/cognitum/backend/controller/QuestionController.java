@@ -1,6 +1,5 @@
 package com.cognitum.backend.controller;
 
-import com.cognitum.backend.dto.response.ResponseCardReview;
 import com.cognitum.backend.dto.response.ResponseFlashcard;
 import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.service.QuestionService;
@@ -36,6 +35,11 @@ public class QuestionController {
         return questionService.getDueCards(token);
     }
 
+    @PostMapping
+    public ResponseOperation createFlashcard(@RequestHeader("Authorization") String token, @RequestBody ResponseFlashcard request) {
+        return questionService.createFlashcard(token, request);
+    }
+
     @PostMapping("/review")
     public ResponseOperation submitReview(@RequestHeader("Authorization") String token, @RequestBody ResponseFlashcard review) {
         return questionService.submitReview(token, review);
@@ -54,6 +58,11 @@ public class QuestionController {
     @DeleteMapping("/flashcards")
     public ResponseOperation deleteAllFlashcardsByNoteId(@RequestHeader("Authorization") String token, @RequestParam Long noteId) {
         return questionService.deleteAllFlashcardsByNoteId(token, noteId);
+    }
+
+    @DeleteMapping("/flashcards/except")
+    public ResponseOperation deleteFlashcardsExcept(@RequestHeader("Authorization") String token, @RequestParam List<Long> flashcardIds) {
+        return questionService.deleteFlashcardsExcept(token, flashcardIds);
     }
 
     @DeleteMapping("/flashcards/{id}")
