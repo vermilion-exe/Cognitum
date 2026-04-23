@@ -112,7 +112,7 @@ pub async fn save_summary(app: AppHandle, summary: String, file_id: String) -> R
 }
 
 #[tauri::command]
-pub async fn get_local_summary(app: AppHandle, file_id: String) -> Result<String, String> {
+pub async fn get_local_summary(app: AppHandle, file_id: String) -> Result<Option<String>, String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -123,12 +123,13 @@ pub async fn get_local_summary(app: AppHandle, file_id: String) -> Result<String
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Err("Summary for file non-existent".to_string());
+        return Ok(None);
     };
 
-    let value = mappings
-        .get(&file_id)
-        .ok_or_else(|| "Note summary not found".to_string())?;
+    let value = match mappings.get(&file_id) {
+        Some(v) => v,
+        None => return Ok(None),
+    };
 
     serde_json::from_str(&value).map_err(|e| e.to_string())
 }

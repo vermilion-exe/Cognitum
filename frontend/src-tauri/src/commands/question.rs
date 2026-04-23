@@ -91,6 +91,23 @@ pub async fn check_flashcard_relevance(
 }
 
 #[tauri::command]
+pub async fn create_flashcard(
+    state: State<'_, AppState>,
+    request: ResponseFlashcard,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/question", &state.base_url);
+
+    send_request::<ResponseOperation, _, _>(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.post(&url).json(&request);
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn submit_review(
     state: State<'_, AppState>,
     review: ResponseFlashcard,
@@ -156,6 +173,31 @@ pub async fn delete_all_flashcards_by_note_id(
     let params = [("note_id", note_id.to_string())];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.delete(url.clone());
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_flashcards_except(
+    state: State<'_, AppState>,
+    ids: Vec<u64>,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/question/except", state.base_url);
+
+    let mut url = reqwest::Url::parse(&url).map_err(|e| e.to_string())?;
+    {
+        let mut query = url.query_pairs_mut();
+        for id in &ids {
+            query.append_pair("ids", &id.to_string());
+        }
+    }
 
     send_request(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.delete(url.clone());

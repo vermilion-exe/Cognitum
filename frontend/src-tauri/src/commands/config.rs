@@ -275,8 +275,7 @@ pub fn load_sync_queue(app: AppHandle) -> Result<Option<HashMap<String, SyncOper
     Ok(Some(queue))
 }
 
-#[tauri::command]
-pub fn delete_app_data(app: AppHandle) -> Result<(), String> {
+fn delete_sync_data_internal(app: &AppHandle) -> Result<(), String> {
     let sync_progress_path = app
         .path()
         .app_data_dir()
@@ -304,8 +303,20 @@ pub fn delete_app_data(app: AppHandle) -> Result<(), String> {
         .join("sync_timestamp.json");
 
     if sync_timestamp_path.exists() {
-        let _ = fs::remove_file(&sync_timestamp_path).map_err(|e| e.to_string());
+        fs::remove_file(&sync_timestamp_path).map_err(|e| e.to_string())
+    } else {
+        Ok(())
     }
+}
+
+#[tauri::command]
+pub fn delete_sync_data(app: AppHandle) -> Result<(), String> {
+    delete_sync_data_internal(&app)
+}
+
+#[tauri::command]
+pub fn delete_app_data(app: AppHandle) -> Result<(), String> {
+    let _ = delete_sync_data_internal(&app);
 
     let config_path = app
         .path()

@@ -164,6 +164,51 @@ pub async fn delete_explanation(
 }
 
 #[tauri::command]
+pub async fn delete_explanations_except(
+    state: tauri::State<'_, AppState>,
+    ids: Vec<String>,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/explanation/except", state.base_url);
+
+    let mut url = reqwest::Url::parse(&url).map_err(|e| e.to_string())?;
+    {
+        let mut query = url.query_pairs_mut();
+        for id in &ids {
+            query.append_pair("ids", &id.to_string());
+        }
+    }
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.delete(url.clone());
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_all_note_explanations(
+    state: tauri::State<'_, AppState>,
+    note_id: u64,
+) -> Result<ResponseOperation, String> {
+    let url = format!("{}/explanation/note", state.base_url);
+    let params = [("noteId", note_id.to_string())];
+
+    let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+
+    send_request(&state, AuthMode::Bearer, |client, token| {
+        let mut request = client.delete(url.clone());
+        if let Some(t) = token {
+            request = request.bearer_auth(t);
+        }
+        request.send()
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn get_highlights_since(
     since: u64,
     state: tauri::State<'_, AppState>,
