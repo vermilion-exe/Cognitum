@@ -6,3 +6,4 @@ export { default as TextEditor } from './TextEditor.tsx';
 export { default as SummaryAccordion } from './SummaryAccordion.tsx';
 export { default as ExplanationAccordion } from './ExplanationAccordion.tsx';
 export { default as EditorOptionScreen } from './EditorOptionScreen.tsx';
+export { default as FileCreationModal } from './FileCreationModal.tsx';
