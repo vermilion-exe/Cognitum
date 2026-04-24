@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
@@ -73,7 +74,7 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
-    public List<ResponseNote> getNotesSince(String token, LocalDateTime timestamp) {
+    public List<ResponseNote> getNotesSince(String token, OffsetDateTime timestamp) {
         ResponseUser user = jwtService.getTokenInfo(token);
         List<Note> notes = noteRepository.findAllByUserIdAndLastUpdatedAfter(user.getId(), timestamp);
 
