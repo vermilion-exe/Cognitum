@@ -1,32 +1,36 @@
 import { ResponseFlashcard } from "../types/ResponseFlashcard";
 import { CardReview } from '../types/CardReview';
 import { useEffect, useState } from 'react';
-import { useSyncStatus } from "../contexts/SyncContext";
 
 function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen, flashcardsLoading, replaceStaleFlashcards, deleteFlashcard, replaceFlashcard }:
     {
         flashcards: ResponseFlashcard[];
-        reviewCard: (key: bigint, review: CardReview) => void;
+        reviewCard: (key: String, review: CardReview) => void;
         setIsFlashcardOverlayOpen: (isOpen: boolean) => void;
         flashcardsLoading: boolean;
         replaceStaleFlashcards: () => void;
-        deleteFlashcard: (flashcardId: bigint) => void;
-        replaceFlashcard: (flashcardId: bigint) => void;
+        deleteFlashcard: (flashcardId: String) => void;
+        replaceFlashcard: (flashcardId: String) => void;
     }) {
     const today = new Date().toISOString().split("T")[0];
     const [flashcardCounter, setFlashcardCounter] = useState(0);
     const [isAnswerShown, setIsAnswerShown] = useState(false);
     const [hasStaleFlashcards, setHasStaleFlashcards] = useState(false);
-    const { syncEnabled } = useSyncStatus();
 
-    const [queue, setQueue] = useState<ResponseFlashcard[]>(() => flashcards.filter((f) => f.next_review <= today));
+    const [queue, setQueue] = useState<ResponseFlashcard[]>(() => flashcards.filter((f) => f.next_review <= today).sort((a, b) => a.next_review.localeCompare(b.next_review)));
 
     useEffect(() => {
         if (!flashcards) return;
         if (flashcards.find((flashcard) => flashcard.is_stale)) {
             setHasStaleFlashcards(true);
         }
-        setQueue(flashcards.filter((f) => f.next_review <= today));
+        setQueue((prevQueue) => {
+            const queueIds = new Set(prevQueue.map((f) => f.id));
+            const newCards = flashcards.filter(
+                (f) => f.next_review <= today && !queueIds.has(f.id)
+            );
+            return [...prevQueue, ...newCards];
+        });
     }, [flashcards]);
 
     const card = queue[flashcardCounter];
@@ -95,13 +99,12 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
                                 (<div className='flex justify-center w-full'>
                                     <button onClick={() => setIsAnswerShown(true)} className='rounded-md border border-gray-400 bg-gray-400 hover:bg-gray-600 px-2 py-1'>Reveal Answer</button>
                                 </div>)}</>)
-                        : (<div>{syncEnabled ? (flashcardsLoading ? (
+                        : (<div>{flashcardsLoading ? (
                             <div className='flex items-center gap-2'>
                                 <span className="animate-spin">⏳</span>
                                 <span>Flashcards are loading..</span>
                             </div>
-                        ) : "Revision for this note is complete!") :
-                            "Enable synchronisation for flashcard revision in settings first"}</div>)}
+                        ) : "Revision for this note is complete!"}</div>)}
                 </div>
 
                 {/* Footer Actions */}

@@ -22,7 +22,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,7 +37,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final FlashcardRepository flashcardRepository;
     private final JwtService jwtService;
 
-    private ResponseCompletion requestQuestions(Long noteId, Integer count) {
+    private ResponseCompletion requestQuestions(String markdown, Integer count) {
         RequestCompletion request = new RequestCompletion();
         request.setModel(nvidiaProperties.getModel());
 
@@ -59,9 +61,7 @@ public class QuestionServiceImpl implements QuestionService {
             ]
             """, count);
 
-        String userPrompt = "Generate flashcards for the following note:\n\n" + noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId))
-                .getText();
+        String userPrompt = "Generate flashcards for the following note:\n\n" + markdown;
 
         request.setMessages(List.of(
                 new RequestMessage("system", systemPrompt),
@@ -74,20 +74,12 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Transactional
     @Override
-    public List<Long> checkFlashcardRelevance(String token, Long noteId) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
-        ResponseUser user = jwtService.getTokenInfo(token);
-        if (!note.getUserId().equals(user.getId())) {
-            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
-        }
-
-        List<Flashcard> flashcards = flashcardRepository.findAllByNoteIdAndIsRetiredFalse(noteId);
+    public List<UUID> checkFlashcardRelevance(String markdown, List<ResponseFlashcard> flashcards) {
         if (flashcards.isEmpty()) return List.of();
 
         String flashcardsJson = flashcards.stream()
                 .map(fc -> String.format(
-                        "{\"id\": %d, \"question\": \"%s\", \"answer\": \"%s\"}",
+                        "{\"id\": %s, \"question\": \"%s\", \"answer\": \"%s\"}",
                         fc.getId(), fc.getQuestion(), fc.getAnswer()))
                 .collect(Collectors.joining(",\n", "[\n", "\n]"));
 
@@ -103,11 +95,11 @@ public class QuestionServiceImpl implements QuestionService {
             - A flashcard is irrelevant if the note no longer contains the concept it tests
             - A flashcard is irrelevant if the answer contradicts the current note content
             - Minor wording changes in the note do NOT make a flashcard irrelevant
-            - Return ONLY a raw JSON array of IDs that are irrelevant, no markdown, no explanation
+            - Return ONLY a raw JSON array of UUIDs that are irrelevant, no markdown, no explanation
             - If all cards are relevant, return an empty array: []
 
-            Ensure the response is in this EXACT format:
-            [1, 4, 7]
+            Ensure the response is in this EXACT format, with UUIDs of the flashcards in quotes:
+            ["UUID1", "UUID2", "UUID3"]
             """;
 
         String userPrompt = """
@@ -118,7 +110,7 @@ public class QuestionServiceImpl implements QuestionService {
             %s
 
             Return the IDs of flashcards that are no longer relevant.
-            """.formatted(note.getText(), flashcardsJson);
+            """.formatted(markdown, flashcardsJson);
 
         request.setMessages(List.of(
                 new RequestMessage("system", systemPrompt),
@@ -132,9 +124,9 @@ public class QuestionServiceImpl implements QuestionService {
             return List.of();
 
         String content = response.getChoices().get(0).getMessage().getContent();
-
+        
         ObjectMapper objectMapper = new ObjectMapper();
-        List<Long> staleIds = objectMapper.readValue(content, new TypeReference<List<Long>>() {});
+        List<UUID> staleIds = objectMapper.readValue(content, new TypeReference<List<UUID>>() {});
 
         if (!staleIds.isEmpty()) {
             flashcardRepository.markStaleByIds(staleIds);
@@ -144,17 +136,8 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public List<ResponseFlashcard> generateFlashcards(String token, Long noteId, Integer count) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
-        ResponseUser user = jwtService.getTokenInfo(token);
-        if (!note.getUserId().equals(user.getId())) {
-            throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
-        }
-
-//        flashcardRepository.deleteAllByNoteId(noteId);
-
-        ResponseCompletion response = requestQuestions(noteId, count);
+    public List<ResponseFlashcard> generateFlashcards(String markdown, Integer count) {
+        ResponseCompletion response = requestQuestions(markdown, count);
         if (response.getChoices() == null)
             return List.of();
 
@@ -167,32 +150,24 @@ public class QuestionServiceImpl implements QuestionService {
                 }
         );
 
-        return responseFlashcards.stream().map(fc -> {
-            Flashcard flashcard = new Flashcard();
-            flashcard.setQuestion(fc.getQuestion());
-            flashcard.setAnswer(fc.getAnswer());
-            flashcard.setType(fc.getType());
-            flashcard.setNote(note);
-            Flashcard savedFlashcard = flashcardRepository.save(flashcard);
-
-            return new ResponseFlashcard(savedFlashcard.getId(),
-                    savedFlashcard.getQuestion(),
-                    savedFlashcard.getAnswer(),
-                    savedFlashcard.getType(),
-                    savedFlashcard.getIsRetired(),
-                    savedFlashcard.getIsStale(),
-                    savedFlashcard.getEasinessFactor(),
-                    savedFlashcard.getInterval(),
-                    savedFlashcard.getRepetitions(),
-                    savedFlashcard.getNextReview(),
-                    savedFlashcard.getLastReviewed(),
-                    noteId
-            );
-        }).toList();
+        return responseFlashcards.stream().map(fc -> new ResponseFlashcard(
+               UUID.randomUUID(),
+               fc.getQuestion(),
+               fc.getAnswer(),
+               fc.getType(),
+               false,
+               false,
+               2.5,
+               1,
+               0,
+               LocalDate.now(),
+               null,
+               null
+       )).toList();
     }
 
     @Override
-    public ResponseOperation updateStaleFlashcards(String token, Long noteId, List<Long> flashcardIds) {
+    public ResponseOperation updateStaleFlashcards(String token, Long noteId, List<UUID> flashcardIds) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
@@ -200,7 +175,7 @@ public class QuestionServiceImpl implements QuestionService {
             throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
 
-        for (Long fid : flashcardIds) {
+        for (UUID fid : flashcardIds) {
             Flashcard flashcard = flashcardRepository.findById(fid)
                     .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + fid));
             if (!flashcard.getNote().getUserId().equals(user.getId())) {
@@ -237,25 +212,31 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public ResponseOperation createFlashcard(String token, ResponseFlashcard request) {
-        ResponseUser user = jwtService.getTokenInfo(token);
-        Flashcard oldFlashcard = flashcardRepository.findById(request.getId())
-                .orElse(null);
-        if (oldFlashcard != null && !oldFlashcard.getNote().getUserId().equals(user.getId())) {
-            throw new UnauthorizedException("Unauthorized access to flashcard with id: " + request.getId());
-        }
+    public ResponseOperation createFlashcards(String token, List<ResponseFlashcard> request) {
+        request.forEach(fc -> {
+            ResponseUser user = jwtService.getTokenInfo(token);
+            Flashcard oldFlashcard = flashcardRepository.findById(fc.getId())
+                    .orElse(null);
+            if (oldFlashcard != null && !oldFlashcard.getNote().getUserId().equals(user.getId())) {
+                throw new UnauthorizedException("Unauthorized access to flashcard with id: " + fc.getId());
+            }
 
-        Flashcard flashcard = getFlashcard(request);
+            Flashcard flashcard = getFlashcard(user, fc);
 
-        flashcardRepository.save(flashcard);
+            flashcardRepository.save(flashcard);
+        });
+
         return new ResponseOperation(true);
     }
 
-    private Flashcard getFlashcard(ResponseFlashcard request) {
+    private Flashcard getFlashcard(ResponseUser user, ResponseFlashcard request) {
         Flashcard flashcard = new Flashcard();
         flashcard.setId(request.getId());
         Note note = noteRepository.findById(request.getNoteId())
                         .orElseThrow(() -> new NotFoundException("Note not found"));
+        if(!note.getUserId().equals(user.getId())) {
+            throw new UnauthorizedException("Unauthorized access to flashcard with id: " + request.getId());
+        }
         flashcard.setNote(note);
         flashcard.setQuestion(request.getQuestion());
         flashcard.setAnswer(request.getAnswer());
@@ -285,7 +266,7 @@ public class QuestionServiceImpl implements QuestionService {
         flashcard.setInterval(review.getInterval());
         flashcard.setRepetitions(review.getRepetitions());
         flashcard.setNextReview(review.getNextReview());
-        flashcard.setLastReviewed(LocalDateTime.now());
+        flashcard.setLastReviewed(OffsetDateTime.now());
 
         flashcardRepository.save(flashcard);
 
@@ -317,6 +298,7 @@ public class QuestionServiceImpl implements QuestionService {
         )).toList();
     }
 
+    @Transactional
     @Override
     public ResponseOperation deleteStaleFlashcards(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
@@ -333,6 +315,7 @@ public class QuestionServiceImpl implements QuestionService {
         return new ResponseOperation(true);
     }
 
+    @Transactional
     @Override
     public ResponseOperation deleteAllFlashcardsByNoteId(String token, Long noteId) {
         Note note = noteRepository.findById(noteId)
@@ -348,7 +331,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Transactional
     @Override
-    public ResponseOperation deleteFlashcardsExcept(String token, List<Long> flashcardIds) {
+    public ResponseOperation deleteFlashcardsExcept(String token, List<UUID> flashcardIds) {
         List<Flashcard> flashcards = flashcardRepository.findAllById(flashcardIds);
 
         if (flashcards.size() != flashcardIds.size()) {
@@ -375,8 +358,9 @@ public class QuestionServiceImpl implements QuestionService {
         return new ResponseOperation(true);
     }
 
+    @Transactional
     @Override
-    public ResponseOperation deleteFlashcard(String token, Long flashcardId) {
+    public ResponseOperation deleteFlashcard(String token, UUID flashcardId) {
         Flashcard flashcard = flashcardRepository.findById(flashcardId)
                 .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + flashcardId));
         ResponseUser user = jwtService.getTokenInfo(token);

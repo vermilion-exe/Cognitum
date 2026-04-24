@@ -5,7 +5,7 @@ use ts_rs::TS;
 #[derive(Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ResponseFlashcard {
-    pub id: u64,
+    pub id: String,
     pub question: String,
     pub answer: String,
     pub r#type: String,
@@ -18,5 +18,5 @@ pub struct ResponseFlashcard {
     pub next_review: NaiveDate,
     #[ts(type = "string")]
     pub last_reviewed: Option<DateTime<Utc>>,
-    pub note_id: u64,
+    pub note_id: Option<u64>,
 }

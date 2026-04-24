@@ -9,6 +9,8 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -16,7 +18,7 @@ import java.time.LocalDateTime;
 @Setter
 public class ResponseFlashcard {
 
-    private Long id;
+    private UUID id;
     private String question;
     private String answer;
     private FlashcardType type;
@@ -31,7 +33,7 @@ public class ResponseFlashcard {
     @JsonProperty("next_review")
     private LocalDate nextReview;
     @JsonProperty("last_reviewed")
-    private LocalDateTime lastReviewed;
+    private OffsetDateTime lastReviewed;
     @JsonProperty("note_id")
     private Long noteId;
 

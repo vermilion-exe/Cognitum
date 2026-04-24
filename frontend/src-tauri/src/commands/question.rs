@@ -1,11 +1,12 @@
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, path::Path};
 
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
+use uuid::Uuid;
 
 use crate::{
     entities::{
-        card_review::CardReview, response_flashcard::ResponseFlashcard,
-        response_operation::ResponseOperation,
+        card_review::CardReview, request_delete_flashcard::RequestDeleteFlashcard,
+        response_flashcard::ResponseFlashcard, response_operation::ResponseOperation,
     },
     utils::{send_request, AuthMode},
     AppState,
@@ -14,14 +15,11 @@ use crate::{
 #[tauri::command]
 pub async fn generate_flashcards(
     state: State<'_, AppState>,
-    note_id: u64,
+    markdown: String,
     count: u32,
 ) -> Result<Vec<ResponseFlashcard>, String> {
     let url = format!("{}/question/flashcards", &state.base_url);
-    let params = [
-        ("noteId", note_id.to_string()),
-        ("count", count.to_string()),
-    ];
+    let params = [("markdown", markdown), ("count", count.to_string())];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
@@ -39,7 +37,7 @@ pub async fn generate_flashcards(
 pub async fn update_stale_flashcards(
     state: State<'_, AppState>,
     note_id: u64,
-    flashcard_ids: Vec<u64>,
+    flashcard_ids: Vec<String>,
 ) -> Result<ResponseOperation, String> {
     let url = format!("{}/question/flashcards/stale", &state.base_url);
     let params = [("noteId", note_id.to_string())];
@@ -57,31 +55,18 @@ pub async fn update_stale_flashcards(
 }
 
 #[tauri::command]
-pub async fn get_due_cards(state: State<'_, AppState>) -> Result<Vec<ResponseFlashcard>, String> {
-    let url = format!("{}/question/due", &state.base_url);
-
-    send_request(&state, AuthMode::Bearer, |client, token| {
-        let mut request = client.get(&url);
-        if let Some(t) = token {
-            request = request.bearer_auth(t);
-        }
-        request.send()
-    })
-    .await
-}
-
-#[tauri::command]
 pub async fn check_flashcard_relevance(
     state: State<'_, AppState>,
-    note_id: u64,
-) -> Result<Vec<u64>, String> {
+    markdown: String,
+    flashcards: Vec<ResponseFlashcard>,
+) -> Result<Vec<String>, String> {
     let url = format!("{}/question/relevance", &state.base_url);
-    let params = [("noteId", note_id.to_string())];
+    let params = [("markdown", markdown)];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
     send_request(&state, AuthMode::Bearer, |client, token| {
-        let mut request = client.get(url.clone());
+        let mut request = client.get(url.clone()).json(&flashcards);
         if let Some(t) = token {
             request = request.bearer_auth(t);
         }
@@ -93,7 +78,7 @@ pub async fn check_flashcard_relevance(
 #[tauri::command]
 pub async fn create_flashcard(
     state: State<'_, AppState>,
-    request: ResponseFlashcard,
+    request: Vec<ResponseFlashcard>,
 ) -> Result<ResponseOperation, String> {
     let url = format!("{}/question", &state.base_url);
 
@@ -130,7 +115,7 @@ pub async fn get_flashcards_by_note_id(
     note_id: u64,
 ) -> Result<Vec<ResponseFlashcard>, String> {
     let url = format!("{}/question/flashcards", &state.base_url);
-    let params = [("note_id", note_id.to_string())];
+    let params = [("noteId", note_id.to_string())];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
@@ -168,9 +153,9 @@ pub async fn delete_stale_flashcards(
 pub async fn delete_all_flashcards_by_note_id(
     state: State<'_, AppState>,
     note_id: u64,
-) -> Result<(), String> {
+) -> Result<ResponseOperation, String> {
     let url = format!("{}/question/flashcards", &state.base_url);
-    let params = [("note_id", note_id.to_string())];
+    let params = [("noteId", note_id.to_string())];
 
     let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
 
@@ -187,15 +172,15 @@ pub async fn delete_all_flashcards_by_note_id(
 #[tauri::command]
 pub async fn delete_flashcards_except(
     state: State<'_, AppState>,
-    ids: Vec<u64>,
+    ids: Vec<String>,
 ) -> Result<ResponseOperation, String> {
-    let url = format!("{}/question/except", state.base_url);
+    let url = format!("{}/question/flashcards/except", state.base_url);
 
     let mut url = reqwest::Url::parse(&url).map_err(|e| e.to_string())?;
     {
         let mut query = url.query_pairs_mut();
         for id in &ids {
-            query.append_pair("ids", &id.to_string());
+            query.append_pair("flashcardIds", &id.to_string());
         }
     }
 
@@ -212,12 +197,11 @@ pub async fn delete_flashcards_except(
 #[tauri::command]
 pub async fn delete_flashcard(
     state: State<'_, AppState>,
-    flashcard_id: u64,
+    request: RequestDeleteFlashcard,
 ) -> Result<ResponseOperation, String> {
     let url = format!(
         "{}/question/flashcards/{}",
-        &state.base_url,
-        flashcard_id.to_string()
+        &state.base_url, request.flashcard_id
     );
 
     send_request(&state, AuthMode::Bearer, |client, token| {
@@ -234,14 +218,15 @@ pub async fn delete_flashcard(
 pub async fn save_local_flashcards(
     state: State<'_, AppState>,
     flashcards: Vec<ResponseFlashcard>,
-    note_id: u64,
+    file_id: String,
 ) -> Result<(), String> {
+    let _lock = &state.flashcard_mapping_lock.lock().await;
     let flashcards_path = &state
         .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(format!("flashcards_{}.json", note_id));
+        .join(get_flashcard_mapping(&state.app_handle, &file_id, _lock)?);
 
     if let Some(parent) = flashcards_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -254,14 +239,15 @@ pub async fn save_local_flashcards(
 #[tauri::command]
 pub async fn load_local_flashcards(
     state: State<'_, AppState>,
-    note_id: u64,
+    file_id: String,
 ) -> Result<Option<Vec<ResponseFlashcard>>, String> {
+    let _lock = &state.flashcard_mapping_lock.lock().await;
     let flashcards_path = &state
         .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(format!("flashcards_{}.json", note_id));
+        .join(get_flashcard_mapping(&state.app_handle, &file_id, _lock)?);
 
     if !flashcards_path.exists() {
         return Ok(None);
@@ -275,20 +261,78 @@ pub async fn load_local_flashcards(
 #[tauri::command]
 pub async fn remove_local_flashcards(
     state: State<'_, AppState>,
-    note_id: u64,
+    file_id: String,
 ) -> Result<(), String> {
+    let _lock = &state.flashcard_mapping_lock.lock().await;
     let flashcards_path = &state
         .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(format!("flashcards_{}.json", note_id));
+        .join(get_flashcard_mapping(&state.app_handle, &file_id, _lock)?);
 
     if !flashcards_path.exists() {
         return Ok(());
     }
 
     fs::remove_file(&flashcards_path).map_err(|e| e.to_string())
+}
+
+async fn remove_local_flashcards_internal(state: &AppState, file_id: String) -> Result<(), String> {
+    let _lock = &state.flashcard_mapping_lock.lock().await;
+    let flashcards_path = &state
+        .app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join(get_flashcard_mapping(&state.app_handle, &file_id, _lock)?);
+
+    if !flashcards_path.exists() {
+        return Ok(());
+    }
+
+    fs::remove_file(&flashcards_path).map_err(|e| e.to_string())
+}
+
+fn get_flashcard_mapping<T>(
+    app: &AppHandle,
+    file_id: &String,
+    _lock: &T,
+) -> Result<String, String> {
+    let mappings_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("flashcard_mappings.json");
+
+    let mut mappings: HashMap<String, String> = if mappings_path.exists() {
+        let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())?
+    } else {
+        HashMap::new()
+    };
+
+    if let Some(value) = mappings.get(file_id) {
+        return Ok(value.clone());
+    }
+
+    let file_name = Path::new(&file_id)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown");
+
+    let new_value = format!("{}_{}.json", file_name, Uuid::new_v4());
+
+    mappings.insert(file_id.clone(), new_value.clone());
+
+    if let Some(parent) = mappings_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let json = serde_json::to_string_pretty(&mappings).map_err(|e| e.to_string())?;
+    fs::write(&mappings_path, json).map_err(|e| e.to_string())?;
+
+    Ok(new_value)
 }
 
 #[tauri::command]
@@ -333,32 +377,23 @@ pub async fn load_review_queue(
 
 #[tauri::command]
 pub async fn delete_local_flashcards(state: State<'_, AppState>) -> Result<(), String> {
-    let app_data_dir = state
-        .app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
-
-    let pattern = app_data_dir.join("flashcards_*.json");
-    let pattern_str = pattern.to_str().ok_or("Invalid path")?;
-
-    let entries = glob::glob(pattern_str).map_err(|e| e.to_string())?;
-
-    for entry in entries {
-        let path = entry.map_err(|e| e.to_string())?;
-        fs::remove_file(&path).map_err(|e| e.to_string())?;
-    }
-
-    let review_queue_path = &state
+    let mappings_path = state
         .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join("flashcard_review_queue.json");
+        .join("flashcard_mappings.json");
 
-    if review_queue_path.exists() {
-        fs::remove_file(&review_queue_path).map_err(|e| e.to_string())
+    let mappings: HashMap<String, String> = if mappings_path.exists() {
+        let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        Ok(())
+        HashMap::new()
+    };
+
+    for (_, filename) in mappings {
+        let _ = remove_local_flashcards_internal(&state, filename);
     }
+
+    fs::remove_file(&mappings_path).map_err(|e| e.to_string())
 }

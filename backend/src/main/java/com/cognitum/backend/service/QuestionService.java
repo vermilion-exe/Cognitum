@@ -4,19 +4,20 @@ import com.cognitum.backend.dto.response.ResponseFlashcard;
 import com.cognitum.backend.dto.response.ResponseOperation;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface QuestionService {
 
-    List<ResponseFlashcard> generateFlashcards(String token, Long noteId, Integer count);
-    ResponseOperation updateStaleFlashcards(String token, Long noteId, List<Long> flashcardIds);
-    List<Long> checkFlashcardRelevance(String token, Long noteId);
+    List<ResponseFlashcard> generateFlashcards(String markdown, Integer count);
+    ResponseOperation updateStaleFlashcards(String token, Long noteId, List<UUID> flashcardIds);
+    List<UUID> checkFlashcardRelevance(String markdown, List<ResponseFlashcard> flashcards);
     List<ResponseFlashcard> getDueCards(String token);
-    ResponseOperation createFlashcard(String token, ResponseFlashcard request);
+    ResponseOperation createFlashcards(String token, List<ResponseFlashcard> request);
     ResponseOperation submitReview(String token, ResponseFlashcard review);
     List<ResponseFlashcard> getFlashcardsByNoteId(String token, Long noteId);
     ResponseOperation deleteStaleFlashcards(String token, Long noteId);
     ResponseOperation deleteAllFlashcardsByNoteId(String token, Long noteId);
-    ResponseOperation deleteFlashcardsExcept(String token, List<Long> flashcardIds);
-    ResponseOperation deleteFlashcard(String token, Long flashcardId);
+    ResponseOperation deleteFlashcardsExcept(String token, List<UUID> flashcardIds);
+    ResponseOperation deleteFlashcard(String token, UUID flashcardId);
 
 }

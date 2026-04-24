@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
@@ -18,8 +19,8 @@ import java.util.UUID;
 public class Flashcard {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID id;
 
     @Column(columnDefinition = "TEXT")
     private String question;
@@ -56,7 +57,7 @@ public class Flashcard {
     private LocalDate nextReview = LocalDate.now();
 
     @Column(name = "last_reviewed")
-    private LocalDateTime lastReviewed;
+    private OffsetDateTime lastReviewed;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "note_id")

@@ -43,7 +43,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
         const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
         const { scheduleSync } = useSyncManager();
-        const { syncEnabled, setStatus, currentNote, setCurrentNote, isNoteLoading } = useSyncStatus();
+        const { syncEnabled, currentNote, setCurrentNote, isNoteLoading } = useSyncStatus();
         const syncEnabledRef = useRef(syncEnabled);
         const currentNoteRef = useRef(currentNote);
         const isNoteLoadingRef = useRef(false);
@@ -156,11 +156,12 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
                     console.log("Syncing the note changes");
                     isCreatingNoteRef.current = true;
-                    setStatus("syncing");
                     scheduleSync(`create-note-${currentNoteRef.current?.id}`,
-                        { type: "note", operation: "create", id: String(currentNoteRef.current?.id), payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path } });
+                        {
+                            type: "note", operation: "create", id: String(currentNoteRef.current?.id),
+                            payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path, created_at: currentNoteRef.current?.created_at, last_updated: currentNoteRef.current?.last_updated }
+                        });
                     setCurrentNote({ ...currentNoteRef.current, text: markdown });
-                    setStatus("idle");
                     isCreatingNoteRef.current = false;
                 })
             }))

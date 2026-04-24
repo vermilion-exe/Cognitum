@@ -3,6 +3,7 @@ pub mod request_auth;
 pub mod request_change_password;
 pub mod request_confirmation;
 pub mod request_delete;
+pub mod request_delete_flashcard;
 pub mod request_move;
 pub mod request_note;
 pub mod request_register;

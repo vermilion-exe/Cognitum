@@ -4,12 +4,14 @@ mod utils;
 
 use commands::{auth, config, explanation, file_system, note, question, summarizer};
 use reqwest::Client;
-use tauri::Manager;
+use tauri::{async_runtime::Mutex, Manager};
 
 pub struct AppState {
     pub client: Client,
     pub base_url: String,
     pub app_handle: tauri::AppHandle,
+    pub highlight_mapping_lock: Mutex<()>,
+    pub flashcard_mapping_lock: Mutex<()>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -21,6 +23,8 @@ pub fn run() {
                 client: reqwest::Client::new(),
                 base_url: "http://localhost:8080/api/cognitum".to_string(),
                 app_handle: handle,
+                highlight_mapping_lock: Mutex::new(()),
+                flashcard_mapping_lock: Mutex::new(()),
             });
             Ok(())
         })
@@ -84,7 +88,6 @@ pub fn run() {
             summarizer::get_summaries_since,   // New command for polling
             question::generate_flashcards,
             question::check_flashcard_relevance,
-            question::get_due_cards,
             question::update_stale_flashcards,
             question::create_flashcard,
             question::submit_review,

@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface FlashcardRepository extends JpaRepository<Flashcard, Long> {
+public interface FlashcardRepository extends JpaRepository<Flashcard, UUID> {
 
     void deleteAllByNoteId(Long noteId);
     List<Flashcard> findAllByNoteId(Long noteId);
@@ -21,11 +21,11 @@ public interface FlashcardRepository extends JpaRepository<Flashcard, Long> {
 
     @Modifying
     @Query("UPDATE Flashcard f SET f.isStale = true WHERE f.id IN :staleIds")
-    void markStaleByIds(List<Long> staleIds);
+    void markStaleByIds(List<UUID> staleIds);
 
     @Modifying
     @Query("DELETE FROM Flashcard f WHERE f.id NOT IN :ids")
-    void deleteAllExcept(List<Long> ids);
+    void deleteAllExcept(List<UUID> ids);
 
     @Query("SELECT f FROM Flashcard f " +
             "WHERE f.note.userId = :userId " +
