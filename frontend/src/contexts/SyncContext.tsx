@@ -52,7 +52,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const [isNoteLoading, setIsNoteLoading] = useState(false);
     const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number | null>(null);
     const { scheduleSync } = useSyncManager();
-    const { activeFileId } = useActiveFile();
+    const { setActiveFileId, activeFileId } = useActiveFile();
     const { user } = useUser();
     const toast = useToast();
 
@@ -94,13 +94,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }, [syncEnabled]);
 
     useEffect(() => {
-        if (!activeFileId || !syncEnabled) {
+        if (!activeFileId || !syncEnabled || status === "syncing") {
             setCurrentNote(null);
             return;
         }
 
         getCurrentNote();
-    }, [activeFileId, syncEnabled]);
+    }, [activeFileId, syncEnabled, status]);
 
     useEffect(() => {
         if (status === "syncing") toast.info("Sync in progress..");
@@ -117,6 +117,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         invoke<Record<string, SyncOperation>>("load_sync_queue")
             .then((saved) => {
                 if (!saved) return;
+                console.log("Replaying offline queue");
                 Object.entries(saved).forEach(([key, op]) => {
                     scheduleSync(key, op);
                 })
@@ -132,20 +133,20 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const timestamp = await invoke<number>("load_sync_timestamp");
         setLastSyncTimestamp(new Date(timestamp).getTime());
 
-        if (!timestamp) {
-            try {
-                const progress = await invoke<RequestSyncProgress | null>("load_sync_progress");
-                if (progress) {
-                    await triggerFullSync(progress);
-                    await replayOfflineQueue();
-                }
+        if (!timestamp || timestamp === null) {
+            console.log("No previous sync, performing full sync.");
+            const progress = await invoke<RequestSyncProgress | null>("load_sync_progress");
+            if (progress) {
+                await triggerFullSync(progress);
+                await replayOfflineQueue();
             }
-            catch (e) {
+            else {
                 await triggerFullSync();
                 await replayOfflineQueue();
             }
         }
         else {
+            console.log("Sync timestamp found, fetching updates.");
             await fetchUpdates();
             await replayOfflineQueue();
         }
@@ -157,12 +158,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setStatus("syncing");
 
         if (!progress) {
-            progress = { completed_note_ids: [], started_at: Date.now().toString() }
+            progress = { completed_note_ids: [], started_at: new Date().toISOString() }
         }
 
         try {
+            console.log("Getting notes from DB.");
             const db_notes = await invoke<RequestNote[]>("get_all_notes");
 
+            console.log("Getting local notes.");
             const children = await invoke<FsNode[]>("scan_dir", {
                 path: root?.id,
                 recursive: true,
@@ -173,10 +176,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 name: root!.name,
                 kind: "dir",
                 children,
-                last_modified: root!.last_modified
+                lastModified: root!.lastModified
             });
 
-            const nodes = collectAllNodes(children);
+            let nodes = collectAllNodes(children);
+            nodes = nodes.filter((node) => node.kind === "file");
             const nodes_with_paths = await Promise.all(
                 nodes.map(async (node) => ({
                     node,
@@ -184,6 +188,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 }))
             );
 
+            if (db_notes.length !== 0) {
+                console.log("Found DB notes, syncing.");
+            }
             await Promise.all(db_notes.map(async (note) => {
                 if (progress.completed_note_ids.includes(note.id!)) return;
 
@@ -193,21 +200,23 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 const fullPath = await getNoteFullPath(note.path);
 
                 // If the local note is newer
-                if (matchedNode && (new Date(matchedNode.node.last_modified) > new Date(note.last_updated))) {
+                if (matchedNode && (new Date(matchedNode.node.lastModified) > new Date(note.last_updated))) {
+                    console.log("Local note is newer for note with path", note.path);
                     // Create the note in DB
                     const text = await getNoteText(note.path);
-                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: new Date(matchedNode.node.last_modified).toISOString() } });
+                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: new Date(matchedNode.node.lastModified).toISOString() } });
 
                     // Push the local summary, if exists
-                    const summary = await invoke<ResponseSummary | null>("get_local_summary", { fileId: matchedNode.node.id });
+                    const summary = await invoke<String | null>("get_local_summary", { fileId: matchedNode.node.id });
                     if (summary !== null) {
-                        await invoke("create_summary", { request: { id: summary.id, summary: summary.summary, note_id: note.id } });
-                        // Ensure local summary points to correct note id
-                        if (summary.note_id !== note.id) {
-                            summary.note_id = note.id;
-                            await invoke("save_summary", { summary: summary });
+                        let id = null;
+                        try {
+                            const summary = await invoke<ResponseSummary | null>("get_summary_by_note_id", { noteId: note.id });
+                            id = summary && summary.id;
                         }
+                        catch (_) { }
 
+                        await invoke("create_summary", { request: { id: id, summary: summary, note_id: note.id } });
                     }
 
                     // Push local highlights, if exist
@@ -237,63 +246,85 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                     }
 
                     // Push local flashcards, if exist
-                    const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { noteId: note.id });
+                    const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { fileId: fullPath });
                     if (flashcards !== null && flashcards.length !== 0) {
                         try {
                             await invoke("delete_flashcards_except", { ids: flashcards.map((f) => f.id) });
-                            await Promise.all(flashcards.map(async (f) => {
-                                await invoke("create_flashcard", { request: { ...f, id: null, note_id: note.id } });
-                            }));
                         }
                         catch (e) {
                             // If flashcards do not exist in DB, delete all
                             await invoke("delete_all_flashcards_by_note_id", { noteId: note.id });
-                            await Promise.all(flashcards.map(async (f) => {
-                                await invoke("create_flashcard", { request: { ...f, note_id: note.id } });
-                            }));
+                        }
+
+                        await invoke("create_flashcard", { request: flashcards.map((f) => ({ ...f, note_id: note.id })) });
+
+                        const local_note_id = flashcards[0].note_id;
+                        if (local_note_id !== note.id) {
+                            await invoke("save_local_flashcards", { fileId: fullPath, flashcards: flashcards.map((f) => ({ ...f, note_id: note.id })) });
                         }
                     }
                     else {
                         await invoke("delete_all_flashcards_by_note_id", { noteId: note.id });
                     }
+                    console.log("Uploaded local note to DB");
                 }
                 // If the database note is newer
-                else {
+                else if (matchedNode && (new Date(matchedNode.node.lastModified) < new Date(note.last_updated))) {
+                    console.log("DB note is newer for note with path", note.path);
+                    if (activeFileId === fullPath)
+                        setActiveFileId(undefined);
                     await invoke("create_file", { path: await getNoteFullPath(note.path), contents: note.text });
 
-                    const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
-                    await invoke("save_summary", { summary: summary });
+                    try {
+                        const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
+                        await invoke("save_summary", { summary: summary });
+                    }
+                    catch (_) { }
 
                     const highlights = await invoke<ResponseHighlight[]>("get_explanations_by_note_id", { noteId: note.id });
                     await invoke("remove_local_highlights", { fileId: fullPath });
                     await invoke("save_highlights", { fileId: fullPath, highlights });
 
                     const flashcards = await invoke<ResponseFlashcard[]>("get_flashcards_by_note_id", { noteId: note.id });
-                    await invoke("remove_local_flashcards", { noteId: note.id });
-                    await invoke("save_local_flashcards", { noteId: note.id, flashcards: flashcards });
+                    await invoke("remove_local_flashcards", { fileId: fullPath });
+                    await invoke("save_local_flashcards", { fileId: fullPath, flashcards: flashcards });
+                    console.log("Downloaded DB note");
                 }
 
                 progress.completed_note_ids.push(note.id!);
                 await invoke("save_sync_progress", { progress });
             }));
 
+            if (nodes_with_paths.length !== 0) {
+                console.log("Local notes found, syncing.");
+            }
             // Add any local files not existing in the database
             await Promise.all(nodes_with_paths.map(async (node_with_path) => {
                 const db_exists = db_notes.some(file => file.path === node_with_path.relativePath);
 
                 if (!db_exists) {
+                    console.log("Note does not exist in DB with path", node_with_path.relativePath);
                     const text = await getNoteText(node_with_path.relativePath!);
+
+                    const last_modified = !node_with_path.node.lastModified ? null : new Date(node_with_path.node.lastModified).toISOString();
                     const createdNote = await invoke<RequestNote>("create_note",
-                        { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: new Date(node_with_path.node.last_modified).toISOString() } });
+                        { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: last_modified } });
 
+                    console.log("created note");
+
+                    console.log("Checking summaries");
                     // Push the local summary, if exists
-                    const summary = await invoke<ResponseSummary | null>("get_local_summary", { fileId: node_with_path.node.id });
-                    if (summary !== null)
-                        await invoke("create_summary", { request: { id: summary.id, summary: summary.summary, note_id: createdNote.id! } });
+                    const summary = await invoke<String | null>("get_local_summary", { fileId: node_with_path.node.id });
+                    if (summary !== null && summary !== "") {
+                        console.log("Found summary, uploading");
+                        await invoke("create_summary", { request: { id: null, summary: summary, note_id: createdNote.id! } });
+                    }
 
+                    console.log("Checking highlights");
                     // Push local highlights, if exist
                     const highlights = await invoke<ResponseHighlight[] | null>("read_highlights", { fileId: node_with_path.node.id });
                     if (highlights !== null && highlights.length !== 0) {
+                        console.log("Found highlights, uploading");
                         // Create the highlights in DB
                         await Promise.all(highlights.map(async (h) => {
                             await invoke("create_explanation", { request: { ...h, note_id: createdNote.id! } });
@@ -306,18 +337,25 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                         }
                     }
 
+                    console.log("Checking flashcards");
                     // Push local flashcards, if exist
-                    const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { noteId: createdNote.id! });
+                    const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { fileId: node_with_path.node.id });
                     if (flashcards !== null && flashcards.length !== 0) {
-                        await Promise.all(flashcards.map(async (f) => {
-                            await invoke("create_flashcard", { request: { ...f, id: null, note_id: createdNote.id! } });
-                        }));
+                        console.log("Found flashcards");
+                        await invoke("create_flashcard", { request: flashcards.map((f) => ({ ...f, note_id: createdNote.id! })) });
+
+                        const local_note_id = flashcards[0].note_id;
+                        if (local_note_id !== createdNote.id) {
+                            await invoke("save_local_flashcards", { fileId: node_with_path.node.id, flashcards: flashcards.map((f) => ({ ...f, note_id: createdNote.id! })) });
+                        }
                     }
 
+                    console.log("Uploaded local note to DB");
                     progress.completed_note_ids.push(createdNote.id!);
                 }
 
                 await invoke("save_sync_progress", { progress });
+                console.log("saved progress");
             }));
 
             setLastSyncTimestamp(Date.now());

@@ -2,6 +2,8 @@ import { marked } from "marked";
 import katex from "katex";
 
 export function renderMarkdownWithLatex(text: string): string {
+    if (text === null) return "";
+
     let rendered = text.replace(
         /\$\$([\s\S]*?)\$\$/g,
         (_, tex) => katex.renderToString(tex.trim(), { displayMode: true }),

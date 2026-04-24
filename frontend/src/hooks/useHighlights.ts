@@ -14,7 +14,7 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
     const [isExplanationLoading, setIsExplanationLoading] = useState(false);
     const isInitialHighlightLoad = useRef(false);
     const { activeFileId } = useActiveFile();
-    const { syncEnabled, currentNote, setStatus } = useSyncStatus();
+    const { syncEnabled, currentNote } = useSyncStatus();
     const { scheduleSync } = useSyncManager();
 
     // Reads the highlights from local directory and saves them in a variable
@@ -28,21 +28,21 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
         }
         catch (e) {
             console.error("Could not read highlights:", e);
+        }
+        finally {
             isInitialHighlightLoad.current = false;
         }
     }
 
     // Save highlight to database if sync is enabled
     async function backupHighlight(highlight: ResponseHighlight) {
-        setStatus("syncing");
         scheduleSync(`highlight-${highlight.id}`,
             {
                 type: "explanation",
                 operation: "create",
                 id: String(highlight.id),
-                payload: { id: highlight.id, from: highlight?.from, to: highlight?.to, selected_text: highlight?.selected_text, explanation: highlight?.explanation, created_at: highlight?.created_at, note_id: currentNote?.id }
+                payload: { id: highlight.id, from: highlight?.from, to: highlight?.to, selected_text: highlight?.selected_text, explanation: highlight?.explanation, created_at: highlight?.created_at, note_id: currentNote?.id! }
             });
-        setStatus("idle");
     }
 
     // Save the highlights locally if they change
@@ -64,8 +64,6 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
 
     // Call backend to explain selected text
     const handleExplanation = async (text: string, from: number, to: number) => {
-        if (!currentNote) return;
-
         setIsExplanationLoading(true);
         const explanation: ResponseExplanation = await invoke<ResponseExplanation>("request_explanation", { text });
 
@@ -76,11 +74,12 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
             selected_text: text,
             explanation: explanation.choices[0].message.content,
             created_at: new Date().toISOString(),
-            note_id: currentNote.id!,
+            note_id: null,
         };
 
         if (syncEnabled) {
             backupHighlight(entry);
+            entry.note_id = currentNote?.id!;
         }
 
         setHighlights((prev) => {

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef } from "react";
 import { useSyncStatus } from "../contexts/SyncContext";
+import { SyncOperation } from "../types/SyncOperation";
 
 const DEBOUNCE_MS = 2000;
 

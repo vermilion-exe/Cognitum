@@ -31,7 +31,7 @@ export function useVaultLoader({ setRoot, redirectIfNoVault }: { setRoot: (root:
                     cfg.vaultPath,
                 kind: "dir",
                 children,
-                last_modified: Date.now()
+                lastModified: Date.now()
             });
         })();
 

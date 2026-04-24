@@ -17,28 +17,24 @@ export function useSummary({ markdownRef, markdown }: { markdownRef: RefObject<s
     const [displayedText, setDisplayedText] = useState("");
     const { activeFileId } = useActiveFile();
     const [fullText, setFullText] = useState("");
-    const { syncEnabled, currentNote, setStatus } = useSyncStatus();
+    const { syncEnabled, currentNote } = useSyncStatus();
     const { scheduleSync } = useSyncManager();
 
     // Save summary function that is called if sync is enabled
     async function saveSummary() {
+        if (!currentNote) return;
         const noteId = currentNote?.id;
         try {
             const summary = await invoke<ResponseSummary | null>("get_summary_by_note_id", { noteId: noteId });
 
             const id = summary ? summary.id : null;
-            setStatus("syncing");
             scheduleSync(`summary-${id}`,
                 { type: "summary", operation: "create", id: String(id), payload: { id: id, summary: fullText, note_id: noteId } });
         }
         catch (e) {
             const uuid = crypto.randomUUID();
-            setStatus("syncing");
             scheduleSync(`summary-${uuid}`,
                 { type: "summary", operation: "create", id: String(uuid), payload: { id: null, summary: fullText, note_id: noteId } });
-        }
-        finally {
-            setStatus("idle");
         }
     }
 
@@ -72,13 +68,15 @@ export function useSummary({ markdownRef, markdown }: { markdownRef: RefObject<s
             isLocalLoad.current = false;
             return;
         }
-        if (!fullText || !syncEnabled) return;
+
+        if (!syncEnabled || !fullText) return;
+
         saveSummary();
     }, [fullText, syncEnabled]);
 
     // If the summary accordion is opened, the summary request is made
     useEffect(() => {
-        if (!isSummaryOpen || isLocalLoad.current || fullText !== "" || !hasEnoughChars) return;
+        if (!isSummaryOpen || isLocalLoad.current || (fullText !== null && fullText !== "") || !hasEnoughChars) return;
 
         const handleGetSummary = async () => {
             await handleSummarize();
