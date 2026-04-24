@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, path::Path};
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
 use crate::{
@@ -38,14 +38,16 @@ pub async fn request_explanation(
 
 #[tauri::command]
 pub async fn read_highlights(
-    app: AppHandle,
+    state: State<'_, AppState>,
     file_id: String,
 ) -> Result<Option<Vec<ResponseHighlight>>, String> {
-    let path = app
+    let _lock = &state.highlight_mapping_lock.lock().await;
+    let path = &state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(get_highlight_mapping(&app, &file_id)?);
+        .join(get_highlight_mapping(&state.app_handle, &file_id, _lock)?);
 
     if !path.exists() {
         return Ok(None);
@@ -58,21 +60,27 @@ pub async fn read_highlights(
 
 #[tauri::command]
 pub async fn save_highlights(
-    app: AppHandle,
+    state: State<'_, AppState>,
     file_id: String,
     highlights: Vec<ResponseHighlight>,
 ) -> Result<(), String> {
-    let highlights_path = app
+    let _lock = &state.highlight_mapping_lock.lock().await;
+    let highlights_path = &state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(get_highlight_mapping(&app, &file_id)?);
+        .join(get_highlight_mapping(&state.app_handle, &file_id, _lock)?);
 
     let json = serde_json::to_string(&highlights).map_err(|e| e.to_string())?;
     fs::write(highlights_path, json).map_err(|e| e.to_string())
 }
 
-fn get_highlight_mapping(app: &AppHandle, file_id: &String) -> Result<String, String> {
+fn get_highlight_mapping<T>(
+    app: &AppHandle,
+    file_id: &String,
+    _lock: &T,
+) -> Result<String, String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -227,15 +235,17 @@ pub async fn get_highlights_since(
 
 #[tauri::command]
 pub async fn remove_highlight(
-    app: AppHandle,
+    state: State<'_, AppState>,
     file_id: String,
     highlight_id: String,
 ) -> Result<(), String> {
-    let highlights_path = app
+    let _lock = &state.highlight_mapping_lock.lock().await;
+    let highlights_path = &state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(get_highlight_mapping(&app, &file_id)?);
+        .join(get_highlight_mapping(&state.app_handle, &file_id, _lock)?);
 
     let text = fs::read_to_string(&highlights_path).map_err(|e| e.to_string())?;
     let mut highlights: Vec<ResponseHighlight> =
@@ -248,12 +258,17 @@ pub async fn remove_highlight(
 }
 
 #[tauri::command]
-pub async fn remove_local_highlights(app: AppHandle, file_id: String) -> Result<(), String> {
-    let highlights_path = app
+pub async fn remove_local_highlights(
+    state: State<'_, AppState>,
+    file_id: String,
+) -> Result<(), String> {
+    let _lock = &state.highlight_mapping_lock.lock().await;
+    let highlights_path = &state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(get_highlight_mapping(&app, &file_id)?);
+        .join(get_highlight_mapping(&state.app_handle, &file_id, _lock)?);
 
     fs::remove_file(&highlights_path).map_err(|e| e.to_string())
 }

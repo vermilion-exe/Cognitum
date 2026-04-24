@@ -186,7 +186,7 @@ pub fn save_sync_timestamp(app: AppHandle, timestamp: DateTime<Utc>) -> Result<(
 }
 
 #[tauri::command]
-pub fn load_sync_timestamp(app: AppHandle) -> Result<DateTime<Utc>, String> {
+pub fn load_sync_timestamp(app: AppHandle) -> Result<Option<DateTime<Utc>>, String> {
     let path = app
         .path()
         .app_data_dir()
@@ -194,7 +194,7 @@ pub fn load_sync_timestamp(app: AppHandle) -> Result<DateTime<Utc>, String> {
         .join("sync_timestamp.json");
 
     if !path.exists() {
-        return Err("No sync timestamp".to_string());
+        return Ok(None);
     }
 
     let text = fs::read_to_string(path).map_err(|e| e.to_string())?;

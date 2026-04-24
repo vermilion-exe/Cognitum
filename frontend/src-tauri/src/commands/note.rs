@@ -59,7 +59,7 @@ pub async fn create_note(
 
 #[tauri::command]
 pub async fn get_all_notes(state: tauri::State<'_, AppState>) -> Result<Vec<RequestNote>, String> {
-    let url = format!("{}/note/all", &state.base_url);
+    let url = format!("{}/note", &state.base_url);
 
     send_request(&state, AuthMode::Bearer, |client, token| {
         let mut request = client.get(&url);

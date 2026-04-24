@@ -12,5 +12,5 @@ pub struct ResponseHighlight {
     pub explanation: String,
     #[ts(type = "string")]
     pub created_at: DateTime<Utc>,
-    pub note_id: u64,
+    pub note_id: Option<u64>,
 }
