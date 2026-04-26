@@ -2,9 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "./useToast";
 
 export function useAuthErrorListener() {
     const navigate = useNavigate();
+    const toast = useToast();
 
     useEffect(() => {
         const unlisten = listen("auth:logout", () => {
@@ -12,6 +14,7 @@ export function useAuthErrorListener() {
             invoke("clear_token", { isRefreshToken: true });
             invoke("clear_token", { isRefreshToken: false });
             navigate("/");
+            toast.info("You were logged out due to security reasons.");
         });
 
         return () => {
