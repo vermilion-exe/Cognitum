@@ -7,6 +7,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from nltk.translate.bleu_score import corpus_bleu
 from rouge_score import rouge_scorer
+from bert_score import score as bert_score
 
 from lib.math_protection import (
     protect_math_spans,
@@ -34,6 +35,18 @@ def main():
         "--encoder_repetition_penalty", type=float, default=1.05
     )
     ap.add_argument("--num_math_placeholders", type=int, default=512)
+    ap.add_argument(
+        "--bert_model",
+        type=str,
+        default="distilbert-base-uncased",
+        help="BERT model for BERTScore",
+    )
+    ap.add_argument(
+        "--bert_device",
+        type=str,
+        default="cuda" if torch.cuda.is_available() else "cpu",
+        help="Device for BERTScore model",
+    )
     args = ap.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
@@ -45,7 +58,16 @@ def main():
     import json
 
     with open(args.test_data, "r", encoding="utf-8") as f:
-        test_data = [json.loads(line) for line in f]
+        content = f.read().strip()
+
+    try:
+        test_data = [
+            json.loads(line)
+            for line in content.splitlines()
+            if line.strip()
+        ]
+    except json.JSONDecodeError:
+        test_data = json.loads(content)  # assumes a JSON array
 
     predictions = []
     references = []
@@ -79,17 +101,29 @@ def main():
         for key in rouge_scores:
             rouge_scores[key].append(scores[key].fmeasure)
 
-    # Average scores
+    # Average ROUGE scores
     for key in rouge_scores:
         rouge_scores[key] = (
             sum(rouge_scores[key]) / len(rouge_scores[key])
         )
+
+    # Calculate BERTScore
+    p, r, f = bert_score(
+        predictions,
+        references,
+        model_type=args.bert_model,
+        device=args.bert_device,
+        batch_size=32,
+        verbose=True,
+    )
+    bert_f1 = f.mean().item()
 
     # Print results
     print(f"BLEU: {bleu:.4f}")
     print(f"ROUGE-1: {rouge_scores['rouge1']:.4f}")
     print(f"ROUGE-2: {rouge_scores['rouge2']:.4f}")
     print(f"ROUGE-L: {rouge_scores['rougeL']:.4f}")
+    print(f"BERTScore F1: {bert_f1:.4f}")
 
 
 def _summarize_text(raw: str, model, tokenizer, args) -> str:
