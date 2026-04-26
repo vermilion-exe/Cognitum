@@ -146,7 +146,7 @@ pub async fn remove_local_summary(app: AppHandle, file_id: String) -> Result<(),
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Err("Summary for file non-existent".to_string());
+        return Ok(());
     };
 
     mappings.remove(&file_id);
