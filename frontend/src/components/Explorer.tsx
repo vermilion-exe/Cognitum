@@ -54,7 +54,7 @@ function Explorer() {
             <div className="flex justify-center py-2 gap-3">
                 <button><img src={addFileIcon} onClick={onCreateFile} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
                 <button><img src={addDirectoryIcon} onClick={onCreateDirectory} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
-                <button><img src={uploadIcon} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
+                {/*<button><img src={uploadIcon} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>*/}
             </div>
             {createType &&
                 <div className='flex flex-col px-2 py-1 bg-background-primary mx-1 rounded-md'>
