@@ -66,10 +66,10 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                 }
 
                 const loadingChanged = tr.getMeta(setLoadingMeta);
-                if (loadingChanged) {
+                if (loadingChanged === true) {
                     loadingAnchor = tr.selection.to;
                 }
-                else {
+                else if (loadingChanged === false) {
                     loadingAnchor = null;
                 }
 
@@ -123,7 +123,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                             anchor,
                             () => {
                                 const span = document.createElement("span");
-                                span.className = "animate-spin inline-block";
+                                span.className = "absolute animate-spin inline-block -top-1";
                                 span.textContent = "⏳";
                                 return span;
                             },

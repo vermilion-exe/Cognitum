@@ -1,7 +1,4 @@
-import {
-    Plugin,
-    PluginKey,
-} from "@milkdown/kit/prose/state";
+import { Plugin, PluginKey } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 
 const key = new PluginKey("selection-tooltip");
@@ -16,9 +13,19 @@ export function selectionTooltipPlugin(
         view(editorView: EditorView) {
             tooltip = document.createElement("div");
             tooltip.className =
-                "absolute z-50 hidden bg-background-secondary " +
-                "border border-button-primary rounded-md shadow-lg px-2 py-1";
-            editorView.dom.parentElement?.appendChild(tooltip);
+                "fixed z-[9999] hidden items-center gap-1 " +
+                "rounded-r-md shadow-button px-2 py-2";
+
+            // Append to body to avoid stacking context / overlap issues
+            document.body.appendChild(tooltip);
+
+            const btn = document.createElement("button");
+            btn.innerHTML = "✨ Explain";
+            btn.className =
+                "flex items-center gap-1 text-white text-sm cursor-pointer " +
+                "px-2 py-1 whitespace-nowrap";
+
+            tooltip.appendChild(btn);
 
             return {
                 update(view: EditorView) {
@@ -29,32 +36,29 @@ export function selectionTooltipPlugin(
                         return;
                     }
 
-                    const selectedText = view.state.doc.textBetween(from, to);
+                    const selectedText = view.state.doc.textBetween(
+                        from,
+                        to
+                    );
 
+                    // Use the start of selection for positioning
                     const start = view.coordsAtPos(from);
                     const end = view.coordsAtPos(to);
-                    const parent =
-                        view.dom.parentElement!.getBoundingClientRect();
 
-                    const left =
-                        (start.left + end.left) / 2 - parent.left;
-                    const top = start.top - parent.top - 40;
+                    const midX = (start.left + end.left) / 2;
+                    // Position above the selection line
+                    const topY = start.top + window.scrollY - 44;
 
                     tooltip!.style.display = "flex";
-                    tooltip!.style.left = `${left}px`;
-                    tooltip!.style.top = `${top}px`;
+                    tooltip!.style.position = "fixed";
+                    tooltip!.style.left = `${midX + 194.5}px`;
+                    tooltip!.style.top = `${start.top - 54.5}px`;
                     tooltip!.style.transform = "translateX(-50%)";
 
-                    tooltip!.innerHTML = "";
-                    const btn = document.createElement("button");
-                    btn.textContent = "✨ Explain";
-                    btn.className =
-                        "text-white text-sm px-2 py-1 hover:opacity-75";
                     btn.onmousedown = (e) => {
                         e.preventDefault();
                         onExplain(selectedText, from, to);
                     };
-                    tooltip!.appendChild(btn);
                 },
                 destroy() {
                     tooltip?.remove();
