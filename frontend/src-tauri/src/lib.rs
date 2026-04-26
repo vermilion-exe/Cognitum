@@ -2,9 +2,13 @@ mod commands;
 mod entities;
 mod utils;
 
-use commands::{auth, config, explanation, file_system, note, question, summarizer};
+use commands::{auth, config, explanation, file_system, note, question, summarizer, watcher};
+use notify::RecommendedWatcher;
+use notify_debouncer_mini::Debouncer;
 use reqwest::Client;
 use tauri::{async_runtime::Mutex, Manager};
+
+use crate::commands::watcher::WatcherState;
 
 pub struct AppState {
     pub client: Client,
@@ -28,6 +32,9 @@ pub fn run() {
             });
             Ok(())
         })
+        .manage(WatcherState(std::sync::Mutex::new(
+            None::<Debouncer<RecommendedWatcher>>,
+        )))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -38,6 +45,8 @@ pub fn run() {
             auth::email_send_code,
             auth::change_password,
             auth::delete_user,
+            watcher::watch_dir,
+            watcher::unwatch_dir,
             config::save_user,
             config::load_user,
             config::clear_user,
@@ -108,7 +117,8 @@ pub fn run() {
             config::load_sync_progress,
             config::clear_sync_progress,
             config::save_sync_queue,
-            config::load_sync_queue
+            config::load_sync_queue,
+            config::get_manual
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

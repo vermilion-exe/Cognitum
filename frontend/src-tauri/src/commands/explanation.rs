@@ -270,6 +270,10 @@ pub async fn remove_local_highlights(
         .map_err(|e| e.to_string())?
         .join(get_highlight_mapping(&state.app_handle, &file_id, _lock)?);
 
+    if !highlights_path.exists() {
+        return Ok(());
+    }
+
     fs::remove_file(&highlights_path).map_err(|e| e.to_string())
 }
 

@@ -5,3 +5,4 @@ pub mod file_system;
 pub mod note;
 pub mod question;
 pub mod summarizer;
+pub mod watcher;

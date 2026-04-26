@@ -330,3 +330,13 @@ pub fn delete_app_data(app: AppHandle) -> Result<(), String> {
         Ok(())
     }
 }
+
+#[tauri::command]
+pub fn get_manual(app: AppHandle) -> Result<String, String> {
+    let manual_path = app
+        .path()
+        .resolve("resources/manual.md", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| e.to_string())?;
+
+    fs::read_to_string(&manual_path).map_err(|e| e.to_string())
+}
