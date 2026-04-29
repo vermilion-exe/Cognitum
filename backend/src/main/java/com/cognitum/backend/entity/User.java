@@ -92,7 +92,6 @@ public class User implements UserDetails {
     @PrePersist
     public void onCreate() {
         dateCreated = LocalDateTime.now();
-        isActive = false;
     }
 
 }

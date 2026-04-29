@@ -14,6 +14,7 @@ import com.cognitum.backend.entity.User;
 import com.cognitum.backend.enums.TokenType;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.ResourceConflictException;
+import com.cognitum.backend.properties.ApplicationProperties;
 import com.cognitum.backend.repository.*;
 import com.cognitum.backend.service.AuthenticationService;
 import com.cognitum.backend.service.EmailService;
@@ -46,6 +47,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final ExplanationRepository explanationRepository;
     private final FlashcardRepository flashcardRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationProperties applicationProperties;
     private final JwtService jwtService;
     private final EmailService emailService;
 
@@ -61,7 +63,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setUsername(requestRegister.getUsername());
         Long confirmationCode = generateRandomConfirmationCode();
         user.setCode(confirmationCode);
-        emailService.sendEmail(user.getEmail(), confirmationCode, false);
+
+        if (applicationProperties.getIsDevMode())
+            user.setIsActive(true);
+        else
+            emailService.sendEmail(user.getEmail(), confirmationCode, false);
 
         User savedUser = userRepository.save(user);
         if(savedUser.getId() != null){
