@@ -148,7 +148,7 @@ html, body, #root {
 }
 
 [data-drag-over="true"] {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(120, 153, 212, 0.4);
 }
 
 *::-webkit-scrollbar {
