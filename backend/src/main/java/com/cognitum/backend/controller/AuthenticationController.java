@@ -1,6 +1,7 @@
 package com.cognitum.backend.controller;
 
 import com.cognitum.backend.dto.request.*;
+import com.cognitum.backend.dto.response.ResponseAttachment;
 import com.cognitum.backend.dto.response.ResponseAuthentication;
 import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUserInfo;
@@ -9,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.OffsetDateTime;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -71,6 +76,30 @@ public class AuthenticationController {
     @DeleteMapping
     public ResponseOperation removeUser(@RequestHeader(value = "Authorization") String token) {
         return service.removeUser(token);
+    }
+
+    @PostMapping("/upload")
+    public ResponseAttachment createAttachment(@RequestHeader("Authorization") String token,
+                                               @RequestParam MultipartFile file,
+                                               @RequestParam String path,
+                                               @RequestParam(required = false) OffsetDateTime createdAt,
+                                                @RequestParam(required = false) OffsetDateTime lastUpdated) {
+        return service.createAttachment(token, file, path, createdAt, lastUpdated);
+    }
+
+    @GetMapping("/attachment")
+    public List<ResponseAttachment> getAttachments(@RequestHeader("Authorization") String token) {
+        return service.getAttachments(token);
+    }
+
+    @PutMapping("/attachment/move")
+    public ResponseOperation moveAttachment(@RequestHeader("Authorization") String token, @RequestParam String oldPath, @RequestParam String newPath) {
+        return service.moveAttachment(token, oldPath, newPath);
+    }
+
+    @DeleteMapping("/attachment")
+    public ResponseOperation deleteAttachment(@RequestHeader("Authorization") String token, @RequestParam String path) {
+        return service.deleteAttachment(token, path);
     }
 
 }

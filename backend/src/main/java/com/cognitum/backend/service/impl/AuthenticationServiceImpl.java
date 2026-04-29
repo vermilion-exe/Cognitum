@@ -4,14 +4,13 @@ import com.cognitum.backend.dto.request.RequestAuthentication;
 import com.cognitum.backend.dto.request.RequestChangePassword;
 import com.cognitum.backend.dto.request.RequestConfirmation;
 import com.cognitum.backend.dto.request.RequestRegister;
-import com.cognitum.backend.dto.response.ResponseAuthentication;
-import com.cognitum.backend.dto.response.ResponseOperation;
-import com.cognitum.backend.dto.response.ResponseUser;
-import com.cognitum.backend.dto.response.ResponseUserInfo;
+import com.cognitum.backend.dto.response.*;
+import com.cognitum.backend.entity.Attachment;
 import com.cognitum.backend.entity.Note;
 import com.cognitum.backend.entity.Token;
 import com.cognitum.backend.entity.User;
 import com.cognitum.backend.enums.TokenType;
+import com.cognitum.backend.exception.BadRequestException;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.ResourceConflictException;
 import com.cognitum.backend.properties.ApplicationProperties;
@@ -28,8 +27,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.security.SecureRandom;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,6 +47,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final SummaryRepository summaryRepository;
     private final ExplanationRepository explanationRepository;
     private final FlashcardRepository flashcardRepository;
+    private final AttachmentRepository attachmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationProperties applicationProperties;
     private final JwtService jwtService;
@@ -270,6 +272,68 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     flashcardRepository.deleteById(flashcard.getId()));
         });
         noteRepository.deleteAll(notes);
+    }
+
+    @Override
+    public ResponseAttachment createAttachment(String token, MultipartFile file, String path, OffsetDateTime createdAt, OffsetDateTime lastUpdated) {
+        if (file.isEmpty())
+            throw new BadRequestException("Attachment is empty");
+
+        try {
+            ResponseUser user = jwtService.getTokenInfo(token);
+
+            Attachment attachment = new Attachment();
+
+            Optional<Attachment> optionalAttachment = attachmentRepository.findByPathAndUserId(path, user.getId());
+
+            optionalAttachment.ifPresent(value -> attachment.setId(value.getId()));
+
+            attachment.setPath(path);
+            attachment.setContentType(file.getContentType());
+            attachment.setBytes(file.getBytes());
+            attachment.setCreatedAt(createdAt != null ? createdAt : OffsetDateTime.now());
+            attachment.setLastUpdated(lastUpdated != null ? lastUpdated : OffsetDateTime.now());
+            attachment.setUserId(user.getId());
+
+            Attachment savedAttachment = attachmentRepository.save(attachment);
+
+            return new ResponseAttachment(savedAttachment.getId(), savedAttachment.getPath(), savedAttachment.getContentType(), savedAttachment.getCreatedAt(), savedAttachment.getLastUpdated(), savedAttachment.getBytes());
+        } catch (Exception ignored) {return null;}
+    }
+
+    @Override
+    public List<ResponseAttachment> getAttachments(String token) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+        List<Attachment> attachments = attachmentRepository.findByUserId(user.getId());
+
+        return attachments.stream()
+                .map(attachment -> new ResponseAttachment(attachment.getId(), attachment.getPath(), attachment.getContentType(), attachment.getCreatedAt(), attachment.getLastUpdated(), attachment.getBytes()))
+                .toList();
+    }
+
+    @Override
+    public ResponseOperation moveAttachment(String token, String oldPath, String newPath) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+
+        Attachment attachment = attachmentRepository.findByPathAndUserId(oldPath, user.getId())
+                .orElseThrow(() -> new NotFoundException("Attachment not found!"));
+
+        attachment.setPath(newPath);
+        attachmentRepository.save(attachment);
+
+        return new ResponseOperation(true);
+    }
+
+    @Override
+    public ResponseOperation deleteAttachment(String token, String path) {
+        ResponseUser user = jwtService.getTokenInfo(token);
+
+        Attachment attachment = attachmentRepository.findByPathAndUserId(path, user.getId())
+                .orElseThrow(() -> new NotFoundException("Attachment not found!"));
+
+        attachmentRepository.delete(attachment);
+
+        return new ResponseOperation(true);
     }
 
 }
