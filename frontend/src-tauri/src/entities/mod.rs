@@ -1,14 +1,17 @@
 pub mod card_review;
+pub mod request_attachment;
 pub mod request_auth;
 pub mod request_change_password;
 pub mod request_confirmation;
 pub mod request_delete;
 pub mod request_delete_flashcard;
 pub mod request_move;
+pub mod request_move_att;
 pub mod request_note;
 pub mod request_register;
 pub mod request_summary;
 pub mod request_sync_progress;
+pub mod response_attachment;
 pub mod response_auth;
 pub mod response_choice;
 pub mod response_explanation;

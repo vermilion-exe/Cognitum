@@ -340,3 +340,23 @@ pub fn get_manual(app: AppHandle) -> Result<String, String> {
 
     fs::read_to_string(&manual_path).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn upload_image(app: AppHandle, file_name: String, bytes: Vec<u8>) -> Result<String, String> {
+    let config_path = config_path(&app)?;
+
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let cfg: AppConfig = fs::read_to_string(config_path.clone())
+        .ok()
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default();
+
+    let path = PathBuf::from(cfg.vault_path.ok_or("Missing vault path")?).join(file_name);
+
+    fs::write(&path, bytes).map_err(|e| e.to_string())?;
+
+    Ok(path.to_string_lossy().to_string())
+}

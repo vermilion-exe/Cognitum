@@ -45,6 +45,10 @@ pub fn run() {
             auth::email_send_code,
             auth::change_password,
             auth::delete_user,
+            auth::get_attachments,
+            auth::create_attachment,
+            auth::delete_attachment,
+            auth::move_attachment,
             watcher::watch_dir,
             watcher::unwatch_dir,
             config::save_user,
@@ -56,12 +60,14 @@ pub fn run() {
             config::delete_sync_data,
             config::delete_app_data,
             file_system::create_file,
+            file_system::create_image,
             file_system::create_directory,
             file_system::read_file,
             file_system::delete_file,
             file_system::delete_directory,
             file_system::rename,
             file_system::move_node,
+            file_system::read_image,
             config::load_config,
             config::save_vault_path,
             config::save_sync_enabled,
@@ -118,7 +124,8 @@ pub fn run() {
             config::clear_sync_progress,
             config::save_sync_queue,
             config::load_sync_queue,
-            config::get_manual
+            config::get_manual,
+            config::upload_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

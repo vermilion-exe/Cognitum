@@ -1,9 +1,15 @@
 use serde::Serialize;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 #[tauri::command]
 pub fn create_file(path: String, contents: String) -> Result<(), String> {
+    fs::write(&path, contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_image(path: String, contents: Vec<u8>) -> Result<(), String> {
     fs::write(&path, contents).map_err(|e| e.to_string())
 }
 
@@ -37,11 +43,27 @@ pub fn move_node(from: String, to: String) -> Result<(), String> {
     fs::rename(&from, &to).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn read_image(path: String) -> Result<Vec<u8>, String> {
+    let image_path = Path::new(&path);
+
+    if !image_path.exists() {
+        return Err("File does not exist!".to_string());
+    }
+
+    let mut file = std::fs::File::open(&image_path).map_err(|e| e.to_string())?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+
+    Ok(buffer)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FSNode {
     pub id: String,
     pub name: String,
+    pub extension: Option<String>,
     pub kind: String,
     pub children: Vec<FSNode>,
     pub last_modified: Option<i64>,
@@ -88,6 +110,10 @@ pub fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode
             .and_then(|m| m.modified().ok())
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as i64);
+        let extension = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|s| s.to_string());
 
         if file_type.is_dir() {
             let children = if recursive {
@@ -98,6 +124,7 @@ pub fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode
             nodes.push(FSNode {
                 id,
                 name,
+                extension,
                 kind: "dir".to_string(),
                 children,
                 last_modified,
@@ -106,6 +133,7 @@ pub fn read_dir_nodes(dir: &Path, recursive: bool) -> std::io::Result<Vec<FSNode
             nodes.push(FSNode {
                 id,
                 name,
+                extension,
                 kind: "file".to_string(),
                 children: vec![],
                 last_modified,
