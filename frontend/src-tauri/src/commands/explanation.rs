@@ -299,7 +299,7 @@ pub async fn delete_local_highlight_data(app: AppHandle) -> Result<(), String> {
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        HashMap::new()
+        return Ok(());
     };
 
     for (_, filename) in mappings {

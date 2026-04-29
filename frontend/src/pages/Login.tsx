@@ -22,7 +22,7 @@ function Login() {
         const payload: RequestAuth = { email, password };
         await invoke<ResponseAuth>("request_auth", { request: payload })
             .then(async (result) => {
-                setUser({ userId: result.user_id, email: result.email, username: result.username });
+                setUser({ userId: result.user_id, email: result.email, username: result.username, is_active: result.is_active });
                 await invoke("save_token", { token: result.access_token, isRefreshToken: false });
                 await invoke("save_token", { token: result.refresh_token, isRefreshToken: true });
                 toast.success("Login successful");
@@ -54,20 +54,20 @@ function Login() {
             <MainHeader />
             <div className='flex flex-col gap-4 w-full max-w-md'>
                 <label htmlFor='Email' className='relative w-full'>
-                    <input type='email' id='Email' placeholder='' value={email} onChange={(e) => setEmail(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <input type='email' name='Email' id='Email' placeholder='' value={email} onChange={(e) => setEmail(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
 
                     <span className='absolute inset-y-2.5 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
                         Email
                     </span>
                 </label>
                 <label htmlFor='Password' className='relative'>
-                    <input type='password' id='Password' placeholder='' value={password} autoComplete='off' onChange={(e) => setPassword(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <input type='password' name='Password' id='Password' placeholder='' value={password} autoComplete='off' onChange={(e) => setPassword(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
 
                     <span className='absolute inset-y-2.5 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
                         Password
                     </span>
                 </label>
-                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50' onClick={handleLogin}>Login</button>
+                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50' name='Login' onClick={handleLogin}>Login</button>
             </div>
         </div>
     );

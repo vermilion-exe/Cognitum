@@ -10,7 +10,7 @@ function EditorOptionScreen() {
         <div className="flex flex-col justify-center h-full items-center gap-10">
             <h1 className="text-5xl">Welcome to Cognitum</h1>
             <div className="flex items-start justify-between w-100">
-                <button className="bg-button-secondary border border-gray-400 rounded-md px-5 py-8 flex flex-col items-center gap-1 hover:bg-button-secondary/50" onClick={() => setIsFileCreation(true)}>
+                <button aria-label='CreateNewFileButton' className="bg-button-secondary border border-gray-400 rounded-md px-5 py-8 flex flex-col items-center gap-1 hover:bg-button-secondary/50" onClick={() => setIsFileCreation(true)}>
                     <img src={addFileIcon} className='w-12 h-12' />
                     Create new file
                 </button>

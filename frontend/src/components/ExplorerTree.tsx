@@ -14,7 +14,7 @@ import { ContextMenuOption } from "../types/ContextMenuOption";
 import { ExplorerContextMenu } from "./ExplorerContextMenu";
 import { useSyncManager } from "../hooks/useSyncManager";
 
-let dragState: {
+export let dragState: {
     nodeId: string;
     node: FsNode;
 } | null = null;
@@ -36,7 +36,7 @@ function ExplorerTree({ nodes, depthPipes = [], isRoot, }:
                             <TreeRow node={node} pipes={depthPipes} isLast={isLast} isOpen={openIds.has(node.id)} isActive={node.id === activeFileId} toggleOpen={toggleOpen} />
 
                             {node.kind === "dir" && openIds.has(node.id) && node.children?.length ? (
-                                <div onDragOver={(e) => { e.preventDefault(); console.log("drag over tree"); }}>
+                                <div>
                                     <ExplorerTree nodes={node.children} depthPipes={nextPipes} isRoot={false} />
                                 </div>
                             ) : null}
@@ -48,7 +48,7 @@ function ExplorerTree({ nodes, depthPipes = [], isRoot, }:
     );
 }
 
-function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node: FsNode; pipes: boolean[]; isLast: boolean; isOpen: boolean; isActive: boolean; toggleOpen: (e: React.MouseEvent, node: FsNode) => void; }) {
+function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node: FsNode; pipes: boolean[]; isLast: boolean; isOpen: boolean; isActive: boolean; toggleOpen: (e: React.MouseEvent, node: FsNode, isNodeCreation: boolean) => void; }) {
     const { root, setRoot, createNode, deleteNode, renameNode } = useFileTree();
     const { syncEnabled } = useSyncStatus();
     const [isDragging, setIsDragging] = useState(false);
@@ -73,10 +73,12 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
 
     const handleNewFile = async () => {
         createNode(node.id, "Untitled", false);
+        toggleOpen({} as React.MouseEvent, node, true);
     }
 
     const handleNewDir = async () => {
         createNode(node.id, "Untitled", true);
+        toggleOpen({} as React.MouseEvent, node, true);
     }
 
     const handleDeleteNode = async () => {
@@ -196,7 +198,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
             name: root!.name,
             kind: "dir",
             children,
-            last_modified: root!.last_modified
+            lastModified: root!.lastModified
         });
     }
 
@@ -248,7 +250,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
         if (!didStartDrag.current) {
             dragStartPos.current = null;
             if (e.button !== 0) return;
-            toggleOpen(e as unknown as React.MouseEvent, node);
+            toggleOpen(e as unknown as React.MouseEvent, node, false);
             return;
         }
 
@@ -323,7 +325,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
                         onChange={(e) => setNewName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") handleRenameNode(); }} />
                 ) : (
-                    <span className="tree-label truncate">{node.name}</span>
+                    <span aria-label={node.name + "_" + node.kind} className="tree-label truncate">{node.name}</span>
                 )
                 }
             </div>

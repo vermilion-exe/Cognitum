@@ -83,10 +83,14 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                 if (tr.docChanged && nextHighlights === undefined) {
                     // Map positions through the transaction, drop invalidated ranges
                     const mapped = highlights.flatMap((h) => {
-                        const from = tr.mapping.map(h.from, 1);
-                        const to = tr.mapping.map(h.to, -1);
-                        if (from >= to || to > tr.doc.content.size) return [];
-                        if (tr.doc.textBetween(from, to) !== h.selected_text) return [];
+                        const from = tr.mapping.map(h.from, -1);
+                        const to = tr.mapping.map(h.to, 1);
+
+                        if (from >= to || to > tr.doc.content.size || tr.doc.textBetween(from, to) !== h.selected_text) {
+                            const pos = findText(tr.doc, h.selected_text);
+                            return pos ? [{ ...h, ...pos }] : [];
+                        }
+
                         return [{ ...h, from, to }];
                     });
 

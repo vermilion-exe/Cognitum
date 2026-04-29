@@ -9,7 +9,7 @@ function Home() {
     const { user } = useUser();
 
     useEffect(() => {
-        if (user && user !== null) {
+        if (user && user !== null && user.is_active) {
             navigate('/mainPage');
         }
     }, [user]);
@@ -38,8 +38,8 @@ function Home() {
             <MainHeader />
             <div className="flex flex-col items-center gap-2">
                 <div className="flex gap-7">
-                    <button className="rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50" onClick={handleLogin}>Login</button>
-                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-2xl px-8 hover:bg-button-secondary/50" onClick={handleRegister}>Register</button>
+                    <button className="rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50" aria-label="Login" onClick={handleLogin}>Login</button>
+                    <button aria-label="Register" className="rounded-md border border-button-secondary bg-button-secondary text-white text-2xl px-8 hover:bg-button-secondary/50" onClick={handleRegister}>Register</button>
                 </div>
                 <button className="text-1xl text-white" onClick={handleGuest}>Continue as a guest...</button>
             </div>

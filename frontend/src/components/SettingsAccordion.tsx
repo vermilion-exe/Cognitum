@@ -117,7 +117,7 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
                             >
                                 Cancel
                             </button>
-                            <button
+                            <button aria-label="ConfirmAccountDeletion"
                                 className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white
                             transition hover:bg-red-700"
                                 onClick={handleDeleteAccount}
@@ -229,14 +229,14 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
                         <img src={lockIcon} />
                         Change Password
                     </button>
-                    <button
+                    <button aria-label="DeleteAccount"
                         className="flex gap-1 rounded-lg bg-red-600 px-4 py-2 text-sm text-white transition hover:bg-red-700 w-45 items-center"
                         onClick={() => setIsDeletionConfirmation(true)}
                     >
                         <img src={deleteIcon} />
                         Delete Account
                     </button>
-                    <button className="flex gap-1 rounded-lg bg-button-secondary px-4 py-2 text-sm text-white transition hover:bg-button-secondary/50 w-45 items-center" onClick={handleLogout}>
+                    <button aria-label="Logout" className="flex gap-1 rounded-lg bg-button-secondary px-4 py-2 text-sm text-white transition hover:bg-button-secondary/50 w-45 items-center" onClick={handleLogout}>
                         <img src={logoutIcon} className="w-4 h-4" />
                         Logout
                     </button>

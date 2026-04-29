@@ -18,7 +18,7 @@ interface FileTreeContextType {
     setRoot: (root: FsNode) => void;
     openIds: Set<string>;
     openFileNodes: FsNode[];
-    toggleOpen: (e: React.MouseEvent, node: FsNode) => void;
+    toggleOpen: (e: React.MouseEvent, node: FsNode, isNodeCreation: boolean) => void;
     closeFile: (id: string) => void;
     createNode: (targetId: string, nodeName: string, isDirectory: boolean) => void;
     deleteNode: (nodeId: string) => void;
@@ -106,11 +106,11 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
         });
     });
 
-    const toggleOpen = (e: React.MouseEvent, node: FsNode) => {
+    const toggleOpen = (e: React.MouseEvent, node: FsNode, isNodeCreation: boolean) => {
         if (node.kind === "dir") {
             setOpenIds(prev => {
                 const next = new Set(prev);
-                if (next.has(node.id)) next.delete(node.id);
+                if (next.has(node.id) && !isNodeCreation) next.delete(node.id);
                 else next.add(node.id);
                 return next;
             });

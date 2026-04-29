@@ -10,7 +10,7 @@ export function selectionTooltipPlugin(
 
     return new Plugin({
         key,
-        view(editorView: EditorView) {
+        view(_: EditorView) {
             tooltip = document.createElement("div");
             tooltip.className =
                 "fixed z-[9999] hidden items-center gap-1 " +
@@ -20,6 +20,7 @@ export function selectionTooltipPlugin(
             document.body.appendChild(tooltip);
 
             const btn = document.createElement("button");
+            btn.ariaLabel = "ExplainText";
             btn.innerHTML = "✨ Explain";
             btn.className =
                 "flex items-center gap-1 text-white text-sm cursor-pointer " +
@@ -47,7 +48,6 @@ export function selectionTooltipPlugin(
 
                     const midX = (start.left + end.left) / 2;
                     // Position above the selection line
-                    const topY = start.top + window.scrollY - 44;
 
                     tooltip!.style.display = "flex";
                     tooltip!.style.position = "fixed";

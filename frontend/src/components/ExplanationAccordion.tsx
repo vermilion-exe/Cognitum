@@ -4,8 +4,8 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { ResponseHighlight } from "../types/ResponseHighlight";
 
-function ExplanationAccordion({activeHighlight, setActiveHighlightId, onRegenerate, onDelete}:
-    {activeHighlight: ResponseHighlight; setActiveHighlightId: (id: string | null) => void; onRegenerate: (id: string) => Promise<void>; onDelete: (id: string) => void}) {
+function ExplanationAccordion({ activeHighlight, setActiveHighlightId, onRegenerate, onDelete }:
+    { activeHighlight: ResponseHighlight; setActiveHighlightId: (id: string | null) => void; onRegenerate: (id: string) => Promise<void>; onDelete: (id: string) => void }) {
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -23,7 +23,7 @@ function ExplanationAccordion({activeHighlight, setActiveHighlightId, onRegenera
                             "{activeHighlight.selected_text}"
                         </p>
                     </div>
-                    <button
+                    <button aria-label='CloseExplanation'
                         className="ml-4 text-gray-400 transition hover:text-white"
                         onClick={() => setActiveHighlightId(null)}
                     >
@@ -34,9 +34,11 @@ function ExplanationAccordion({activeHighlight, setActiveHighlightId, onRegenera
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                     <div className="prose prose-invert wrap-break-word max-w-none">
-                       <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
-                            {activeHighlight.explanation}
-                        </Markdown>
+                        <div aria-label='ExplanationContent'>
+                            <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
+                                {activeHighlight.explanation}
+                            </Markdown>
+                        </div>
                     </div>
                 </div>
 

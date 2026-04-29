@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MainHeader } from '../components';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
@@ -14,6 +14,12 @@ function Register() {
     const { setUser } = useUser();
     const navigate = useNavigate();
     const toast = useToast();
+    const isTestMode = import.meta.env.MODE === 'test';
+
+    useEffect(() => {
+        console.log(import.meta.env.MODE);
+        console.log(isTestMode);
+    }, []);
 
     function handleReturn() {
         navigate('/');
@@ -23,7 +29,7 @@ function Register() {
         const payload: RequestRegister = { username, email, password };
         await invoke<ResponseAuth>("request_register", { request: payload })
             .then(async (result) => {
-                setUser({ userId: result.user_id, email: result.email, username: result.username });
+                setUser({ userId: result.user_id, email: result.email, username: result.username, is_active: result.is_active });
                 await invoke("save_token", { token: result.access_token, isRefreshToken: false });
                 await invoke("save_token", { token: result.refresh_token, isRefreshToken: true });
                 toast.success("Register successful");
@@ -74,7 +80,7 @@ function Register() {
                         Password
                     </span>
                 </label>
-                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50' onClick={handleRegister}>Register</button>
+                <button className='rounded-md border border-button-primary bg-button-primary text-white text-2xl px-12 hover:bg-button-primary/50' name='Register' onClick={handleRegister}>Register</button>
             </div>
         </div>
     );

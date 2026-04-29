@@ -26,10 +26,12 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
         }
         setQueue((prevQueue) => {
             const queueIds = new Set(prevQueue.map((f) => f.id));
+            const newIds = new Set(flashcards.map((f) => f.id));
+            const filteredQueue = prevQueue.filter((f) => newIds.has(f.id));
             const newCards = flashcards.filter(
                 (f) => f.next_review <= today && !queueIds.has(f.id)
             );
-            return [...prevQueue, ...newCards];
+            return [...filteredQueue, ...newCards];
         });
     }, [flashcards]);
 
@@ -57,13 +59,17 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
                     <div>
                         <h2 className="text-lg font-semibold text-white">Flashcard Revision</h2>
                         {hasStaleFlashcards && (
-                            <div className="bg-yellow-300/30 border border-yellow-300 p-1 rounded-md">
+                            <div aria-label="StaleWarning" className="bg-yellow-300/30 border border-yellow-300 p-1 rounded-md">
                                 Your note has some stale flashcards due to content change.
-                                <button className="text-blue-600 underline hover:text-blue-600/50 cursor-pointer" onClick={() => { setHasStaleFlashcards(false); replaceStaleFlashcards(); }}>Press here to replace them.</button>
+                                <button aria-label="ReplaceStaleFlashcards"
+                                    className="text-blue-600 underline hover:text-blue-600/50 cursor-pointer"
+                                    onClick={() => { setHasStaleFlashcards(false); replaceStaleFlashcards(); }}>
+                                    Press here to replace them.
+                                </button>
                             </div>
                         )}
                     </div>
-                    <button
+                    <button aria-label="CloseFlashcards"
                         className="ml-4 text-gray-400 transition hover:text-white"
                         onClick={() => setIsFlashcardOverlayOpen(false)}
                     >
@@ -74,7 +80,7 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                     {!isFinished ?
-                        (<><div>
+                        (<div aria-label="FlashcardContent"><div aria-label="FlashcardQuestion">
                             {card.question}
                         </div>
                             {isAnswerShown && (
@@ -92,13 +98,13 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
                                         [4, "Easy"],
                                         [5, "Very Easy"],
                                     ].map(([q, label]) => (
-                                        <button key={q} className="rounded-md border border-gray-400 bg-gray-400 px-2 py-1 hover:bg-gray-600" onClick={() => submitReview(q as number)}>{label}</button>
+                                        <button aria-label={label.toString()} key={q} className="rounded-md border border-gray-400 bg-gray-400 px-2 py-1 hover:bg-gray-600" onClick={() => submitReview(q as number)}>{label}</button>
                                     ))}
                                 </div>
                             ) :
                                 (<div className='flex justify-center w-full'>
-                                    <button onClick={() => setIsAnswerShown(true)} className='rounded-md border border-gray-400 bg-gray-400 hover:bg-gray-600 px-2 py-1'>Reveal Answer</button>
-                                </div>)}</>)
+                                    <button aria-label="RevealAnswer" onClick={() => setIsAnswerShown(true)} className='rounded-md border border-gray-400 bg-gray-400 hover:bg-gray-600 px-2 py-1'>Reveal Answer</button>
+                                </div>)}</div>)
                         : (<div>{flashcardsLoading ? (
                             <div className='flex items-center gap-2'>
                                 <span className="animate-spin">⏳</span>

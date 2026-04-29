@@ -24,12 +24,11 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
             const loaded = (await invoke<ResponseHighlight[] | null>("read_highlights", { fileId: fileId })) ?? [];
             setHighlights(loaded);
             setActiveHighlightId(null);
+            if (!loaded || loaded === null || loaded.length === 0) isInitialHighlightLoad.current = false;
             return loaded;
         }
         catch (e) {
             console.error("Could not read highlights:", e);
-        }
-        finally {
             isInitialHighlightLoad.current = false;
         }
     }

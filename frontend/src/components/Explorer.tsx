@@ -1,16 +1,23 @@
-import ExplorerTree from './ExplorerTree';
+import ExplorerTree, { dragState } from './ExplorerTree';
 import addFileIcon from "../assets/add_file.svg";
 import addDirectoryIcon from "../assets/add_directory.svg";
-import uploadIcon from "../assets/upload.svg";
 import { useState } from 'react';
 import { useFileTree } from '../contexts/FileTreeContext';
-import { findNodeShallow } from '../utils/fsUtils';
+import { findNodeInDir, findNodeShallow, toRelativePath } from '../utils/fsUtils';
 import { useToast } from '../hooks/useToast';
+import { FsNode } from '../types/FsNode';
+import { join } from "@tauri-apps/api/path";
+import { useSyncManager } from '../hooks/useSyncManager';
+import { invoke } from '@tauri-apps/api/core';
+import { useSyncStatus } from '../contexts/SyncContext';
 
 function Explorer() {
     const [createType, setCreateType] = useState<String>();
     const [nodeName, setNodeName] = useState<string>("");
-    const { root, createNode } = useFileTree();
+    const { root, setRoot, createNode } = useFileTree();
+    const [isDragOver, setIsDragOver] = useState(false);
+    const { scheduleSync } = useSyncManager();
+    const { syncEnabled } = useSyncStatus();
     const toast = useToast();
 
     const onCreateFile = () => {
@@ -48,12 +55,85 @@ function Explorer() {
         setNodeName("");
     };
 
+    const moveNotes = async (node: FsNode, parentPath: string) => {
+        if (node.kind === "dir") {
+            await Promise.all((node.children ?? []).map(async (child) => {
+                const newPath = await join(parentPath, child.name);
+                await moveNotes(child, newPath);
+            }));
+            return;
+        }
+
+        const oldPath = await toRelativePath(node.id);
+        const newPath = await join(parentPath, node.name + ".md");
+        const relativeNewPath = await toRelativePath(newPath);
+        if (!relativeNewPath) return;
+
+        const id = crypto.randomUUID();
+        scheduleSync(`move-note-${id}`, {
+            type: "note",
+            operation: "move",
+            id: String(id),
+            payload: { old_path: oldPath, new_path: relativeNewPath },
+        });
+    };
+
+    const handleSpacerPointerUp = async (_: React.PointerEvent) => {
+        if (!dragState) return;
+
+        const targetId = root?.id;
+        if (!targetId) return;
+
+        const draggedNode = dragState.node;
+
+        // Already in root
+        if (draggedNode.id.replace(/\\[^\\]+$/, "") === targetId) {
+            setIsDragOver(false);
+            return;
+        }
+
+        const newPath = `${targetId}\\${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`;
+
+        if (findNodeInDir(root, targetId, newPath)) {
+            toast.warning("Node in given directory already exists");
+            setIsDragOver(false);
+            return;
+        }
+
+        if (syncEnabled) {
+            try {
+                await moveNotes(draggedNode, targetId);
+            } catch (err) {
+                console.error("Couldn't move notes", err);
+                setIsDragOver(false);
+                return;
+            }
+        }
+
+        await invoke("move_node", { from: draggedNode.id, to: newPath });
+
+        const children = await invoke<FsNode[]>("scan_dir", {
+            path: root?.id,
+            recursive: true,
+        });
+
+        setRoot({
+            id: root!.id,
+            name: root!.name,
+            kind: "dir",
+            children,
+            lastModified: root!.lastModified,
+        });
+
+        setIsDragOver(false);
+    };
+
     return (
-        <div>
-            <div className='h-9 bg-background-secondary' data-tauri-drag-region />
+        <div className='flex flex-col h-full'>
+            <div className='h-12.5 bg-background-secondary' data-tauri-drag-region />
             <div className="flex justify-center py-2 gap-3">
-                <button><img src={addFileIcon} onClick={onCreateFile} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
-                <button><img src={addDirectoryIcon} onClick={onCreateDirectory} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
+                <button aria-label='CreateFile'><img src={addFileIcon} onClick={onCreateFile} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
+                <button aria-label='CreateDirectory'><img src={addDirectoryIcon} onClick={onCreateDirectory} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
                 {/*<button><img src={uploadIcon} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>*/}
             </div>
             {createType &&
@@ -67,12 +147,22 @@ function Explorer() {
                             ✕
                         </button>
                     </div>
-                    <input name="nodeName" value={nodeName} onChange={(e) => setNodeName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleNameSelection(); }}
-                        className='h-7 rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <label>
+                        <input aria-label="NodeName" value={nodeName} onChange={(e) => setNodeName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleNameSelection(); }}
+                            className='w-full h-7 rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    </label>
                 </div>
             }
             <ExplorerTree nodes={root?.children ?? []} isRoot={true} />
+            <div className={`flex-1 rounded-md transition-colors ${isDragOver ? "bg-button-primary/40" : ""}`}
+                data-drop-id={root?.id}
+                data-drop-kind="dir"
+                data-drag-over="false"
+                onPointerUp={handleSpacerPointerUp}
+                onPointerEnter={() => { if (dragState) setIsDragOver(true); }}
+                onPointerLeave={() => setIsDragOver(false)}>
+            </div>
         </div>
     );
 }

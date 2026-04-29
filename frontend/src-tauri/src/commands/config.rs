@@ -166,8 +166,8 @@ pub fn clear_token(is_refresh_token: bool) -> Result<(), String> {
     };
     let entry = keyring::Entry::new("cognitum", token_type).map_err(|e| e.to_string())?;
 
-    match entry.get_password() {
-        Ok(_) => entry.delete_password().map_err(|e| e.to_string()),
+    match entry.delete_password() {
+        Ok(_) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
     }

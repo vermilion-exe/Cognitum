@@ -37,8 +37,8 @@ function FileCreationModal({ setIsModalActive }: { setIsModalActive: (isActive: 
                 <div className="flex-1 overflow-y-auto p-6">
                     <div className="prose prose-invert wrap-break-word max-w-none">
                         <h1 className="text-xl">Please enter the file name:</h1>
-                        <label htmlFor='FileName' className='relative'>
-                            <input type='text' id='FileName' placeholder='' value={fileName} onChange={(e) => setFileName(e.target.value)}
+                        <label className='relative'>
+                            <input type='text' aria-label='FileName' placeholder='' value={fileName} onChange={(e) => setFileName(e.target.value)}
                                 className='peer w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white mt-4 mb-3' />
 
                             <span className='absolute inset-y-0 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
@@ -56,7 +56,7 @@ function FileCreationModal({ setIsModalActive }: { setIsModalActive: (isActive: 
                     >
                         Close
                     </button>
-                    <button
+                    <button aria-label="SubmitCreateFile"
                         className="rounded-lg bg-button-primary px-4 py-2 text-sm text-white transition hover:bg-button-primary/50"
                         onClick={() => handleFileCreation()}
                     >

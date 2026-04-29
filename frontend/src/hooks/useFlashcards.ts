@@ -53,7 +53,10 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
 
     // Generate flashcards for the current note
     useEffect(() => {
-        if (!activeFileId || !markdown) return;
+        if (!activeFileId || !markdown) {
+            setFlashcardsLoading(false);
+            return;
+        }
 
         if (prevFileIdRef.current !== activeFileIdRef.current) setFlashcards([]);
         prevFileIdRef.current = activeFileIdRef.current;
@@ -135,7 +138,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
 
         const fileId = activeFileIdRef?.current!;
         const markdown = markdownRef?.current!;
-        const noteId = currentNoteRef?.current!.id;
+        const noteId = currentNoteRef?.current?.id;
         const currentFlashcards = flashcardsRef.current;
         let staleCount = flashcards.filter((f) => f.is_stale).length;
         staleCount = staleCount > 10 ? 10 : staleCount;
@@ -177,13 +180,14 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         }
         finally {
             console.log("Saving updated flashcards locally:", updatedFlashcards);
-            await invoke("save_local_flashcards", { noteId: noteId, flashcards: updatedFlashcards });
+            await invoke("save_local_flashcards", { fileId: fileId, flashcards: updatedFlashcards });
         }
     }
 
     const deleteFlashcard = async (flashcardId: String) => {
         if (!flashcards.find((f) => f.id === flashcardId)) return;
 
+        const fileId = activeFileIdRef.current!;
         const noteId = currentNoteRef.current?.id!;
         const currentFlashcards = flashcardsRef.current;
 
@@ -192,7 +196,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         }
 
         let updatedFlashcards = currentFlashcards.filter((f) => f.id !== flashcardId);
-        await invoke("save_local_flashcards", { noteId: noteId, flashcards: updatedFlashcards });
+        await invoke("save_local_flashcards", { fileId: fileId, flashcards: updatedFlashcards });
 
         if (syncEnabled) {
             const id = crypto.randomUUID();
@@ -204,6 +208,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
 
     const replaceFlashcard = async (flashcardId: String) => {
         if (!flashcards.find((f) => f.id === flashcardId)) return;
+        const fileId = activeFileIdRef.current!;
         const noteId = currentNoteRef.current?.id!;
         const currentFlashcards = flashcardsRef.current;
 
@@ -222,7 +227,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
             scheduleSync(`flashcard-${id}`,
                 { type: "flashcard", operation: "create", id: String(id), payload: [...updatedFlashcards.map((f) => ({ ...f, note_id: currentNoteRef.current?.id! }))] });
         }
-        await invoke("save_local_flashcards", { noteId: noteId, flashcards: updatedFlashcards });
+        await invoke("save_local_flashcards", { fileId: fileId, flashcards: updatedFlashcards });
     }
 
     const flushPersistedQueue = useCallback(async () => {

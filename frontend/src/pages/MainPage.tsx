@@ -36,9 +36,9 @@ function MainPage() {
         <div className="flex flex-1 h-full overflow-hidden">
             <div className="grow bg-background-primary min-h-0 overflow-hidden flex flex-col">
                 <div className="flex justify-end w-full sticky z-10 shrink-0">
-                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2 hover:bg-button-secondary/50"
+                    <button aria-label="ReviseButton" className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2 hover:bg-button-secondary/50"
                         onClick={() => setIsFlashcardOverlayOpen(true)} disabled={!flashcards}>Revise</button>
-                    <button className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2 hover:bg-button-secondary/50"
+                    <button aria-label="SummarizeButton" className="rounded-md border border-button-secondary bg-button-secondary text-white text-xl px-8 mt-3 mr-2 hover:bg-button-secondary/50"
                         onClick={() => setIsSummaryOpen(true)} disabled={isSummaryLoading}>{isSummaryLoading ? "Summarizing..." : "Summarize"}</button>
                 </div>
                 {activeFileId ? (

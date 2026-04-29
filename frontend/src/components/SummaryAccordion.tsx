@@ -17,7 +17,7 @@ function SummaryAccordion({ isLoading, text, onClose, onRegenerate, hasEnoughCha
                     <div>
                         <h2 className="text-lg font-semibold text-white">Summary</h2>
                     </div>
-                    <button
+                    <button aria-label='CloseSummary'
                         className="ml-4 text-gray-400 transition hover:text-white"
                         onClick={onClose}
                     >
@@ -35,9 +35,11 @@ function SummaryAccordion({ isLoading, text, onClose, onRegenerate, hasEnoughCha
                                     <span>Generating the summary..</span>
                                 </div>
                             ) : (
-                                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
-                                    {text}
-                                </Markdown>
+                                <div aria-label='SummaryContent'>
+                                    <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
+                                        {text}
+                                    </Markdown>
+                                </div>
                             )
                         ) : "Nothing to summarize..."}
                     </div>

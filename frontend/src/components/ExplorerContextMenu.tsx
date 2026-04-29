@@ -33,6 +33,7 @@ export function ExplorerContextMenu({
             style={{ left: x, top: y }}>
             {options.map((opt) => (
                 <button
+                    aria-label={opt.label}
                     key={opt.label}
                     className={`w-full text-left px-4 py-2 hover:bg-white/10 transition-colors ${opt.danger ? "text-red-400" : ""}`}
                     onMouseUp={(e) => {

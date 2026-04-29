@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { RefObject, useEffect, useRef, useState } from "react";
-import { ResponseSummary } from "../types/SyncTypes";
+import { ResponseSummary } from "../types/ResponseSummary";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { useSyncManager } from "./useSyncManager";
 import { renderMarkdownWithLatex } from "../utils/markdownUtils";
@@ -47,6 +47,7 @@ export function useSummary({ markdownRef, markdown }: { markdownRef: RefObject<s
                 const summary = await invoke<string>("get_local_summary", { fileId: activeFileId });
                 setFullText(summary);
                 setDisplayedText(summary);
+                if (!summary || summary === null || summary.length === 0) isLocalLoad.current = false;
             }
             catch (e) {
                 setFullText("");
@@ -87,7 +88,7 @@ export function useSummary({ markdownRef, markdown }: { markdownRef: RefObject<s
 
     // Use a timer to slowly change displayed text
     useEffect(() => {
-        if (!fullText || displayedText.length >= fullText.length) return;
+        if (!fullText || fullText === null || displayedText.length >= fullText.length) return;
 
         const timeout = setTimeout(() => {
             setDisplayedText(fullText.slice(0, displayedText.length + 1));
