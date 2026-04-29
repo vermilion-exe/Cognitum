@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.mockito.ArgumentMatchers.*;
@@ -218,7 +219,7 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return 404 for non-existent flashcard")
         void shouldReturn404ForNonExistentFlashcard() {
-            ResponseFlashcard flashcard = new ResponseFlashcard(9999L, null, null, null, false, false, 1.0, 1, 1, null, null, null);
+            ResponseFlashcard flashcard = new ResponseFlashcard(UUID.randomUUID(), null, null, null, false, false, 1.0, 1, 1, null, null, null);
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
@@ -341,14 +342,14 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             getNote(auth.getAccessToken(), updateNote);
 
             // Get the irrelevant flashcard IDs
-            List<Long> flashcardIds = given()
+            List<UUID> flashcardIds = given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
                     .get("/api/cognitum/question/relevance?noteId=" + noteId)
                     .then()
                     .statusCode(200)
                     .extract()
-                    .as(new TypeRef<List<Long>>() {});
+                    .as(new TypeRef<List<UUID>>() {});
 
             // Remove the irrelevant flashcards
             given()

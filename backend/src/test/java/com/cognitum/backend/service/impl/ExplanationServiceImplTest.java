@@ -21,7 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -70,8 +70,8 @@ class ExplanationServiceImplTest {
         mockNote.setText("Test note content");
         mockNote.setUserId(mockUser.getId());
         mockNote.setPath("/test/path");
-        mockNote.setCreatedAt(LocalDateTime.now());
-        mockNote.setLastUpdated(LocalDateTime.now());
+        mockNote.setCreatedAt(OffsetDateTime.now());
+        mockNote.setLastUpdated(OffsetDateTime.now());
     }
 
     @Test
@@ -125,7 +125,7 @@ class ExplanationServiceImplTest {
         request.setExplanation("explanation content");
         request.setFrom(0);
         request.setTo(10);
-        request.setCreatedAt(LocalDateTime.now());
+        request.setCreatedAt(OffsetDateTime.now());
 
         RequestHighlight result = explanationService.createExplanation(mockToken, request);
 
@@ -147,7 +147,7 @@ class ExplanationServiceImplTest {
         request.setExplanation("test explanation");
         request.setFrom(5);
         request.setTo(15);
-        LocalDateTime createdAt = LocalDateTime.now();
+        OffsetDateTime createdAt = OffsetDateTime.now();
         request.setCreatedAt(createdAt);
 
         explanationService.createExplanation(mockToken, request);
@@ -206,7 +206,7 @@ class ExplanationServiceImplTest {
         explanation.setSelectedText("selected");
         explanation.setFrom(0);
         explanation.setTo(10);
-        explanation.setCreatedAt(LocalDateTime.now());
+        explanation.setCreatedAt(OffsetDateTime.now());
         explanation.setNote(mockNote);
 
         when(explanationRepository.findById(explanationId)).thenReturn(Optional.of(explanation));
@@ -261,7 +261,7 @@ class ExplanationServiceImplTest {
         explanation1.setSelectedText("text 1");
         explanation1.setFrom(0);
         explanation1.setTo(5);
-        explanation1.setCreatedAt(LocalDateTime.now());
+        explanation1.setCreatedAt(OffsetDateTime.now());
         explanation1.setNote(mockNote);
 
         Explanation explanation2 = new Explanation();
@@ -269,7 +269,7 @@ class ExplanationServiceImplTest {
         explanation2.setSelectedText("text 2");
         explanation2.setFrom(10);
         explanation2.setTo(20);
-        explanation2.setCreatedAt(LocalDateTime.now());
+        explanation2.setCreatedAt(OffsetDateTime.now());
         explanation2.setNote(mockNote);
 
         mockNote.setExplanations(Arrays.asList(explanation1, explanation2));

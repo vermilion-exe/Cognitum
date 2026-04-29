@@ -17,7 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,8 +61,8 @@ class SummaryServiceImplTest {
         mockNote.setText("Test note content for summarization");
         mockNote.setUserId(mockUser.getId());
         mockNote.setPath("/test/path");
-        mockNote.setCreatedAt(LocalDateTime.now());
-        mockNote.setLastUpdated(LocalDateTime.now());
+        mockNote.setCreatedAt(OffsetDateTime.now());
+        mockNote.setLastUpdated(OffsetDateTime.now());
     }
 
     @Test

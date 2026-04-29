@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
@@ -277,7 +279,7 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
         @DisplayName("should return notes updated since timestamp")
         void shouldReturnNotesSince() {
             // Create a note with a past timestamp
-            RequestNote requestNote = new RequestNote(null, "This is a test note.", "/testnote", null, LocalDateTime.of(2000, 1, 2, 0, 0, 0)); // 2000-01-02T00:00:00Z
+            RequestNote requestNote = new RequestNote(null, "This is a test note.", "/testnote", null, OffsetDateTime.of(LocalDateTime.of(2000, 1, 2, 0, 0, 0), ZoneOffset.UTC)); // 2000-01-02T00:00:00Z
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
@@ -305,7 +307,7 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
         @DisplayName("should return empty list when no notes updated since timestamp")
         void shouldReturnEmptyListForFutureTimestamp() {
             // Create a note
-            RequestNote requestNote = new RequestNote(null, "This is a test note.", "/testnote", null, LocalDateTime.of(2000, 1, 2, 0, 0, 0));
+            RequestNote requestNote = new RequestNote(null, "This is a test note.", "/testnote", null, OffsetDateTime.of(LocalDateTime.of(2000, 1, 2, 0, 0, 0), ZoneOffset.UTC));
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)

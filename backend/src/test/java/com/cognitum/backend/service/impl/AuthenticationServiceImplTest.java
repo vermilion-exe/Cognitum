@@ -8,10 +8,10 @@ import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
 import com.cognitum.backend.entity.Token;
 import com.cognitum.backend.entity.User;
-import com.cognitum.backend.enums.TokenType;
-import com.cognitum.backend.exception.BadRequestException;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.ResourceConflictException;
+import com.cognitum.backend.properties.ApplicationProperties;
+import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.repository.TokenRepository;
 import com.cognitum.backend.repository.UserRepository;
 import com.cognitum.backend.service.EmailService;
@@ -21,7 +21,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -46,7 +45,13 @@ class AuthenticationServiceImplTest {
     private TokenRepository tokenRepository;
 
     @Mock
+    private NoteRepository noteRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private ApplicationProperties applicationProperties;
 
     @Mock
     private JwtService jwtService;
@@ -79,14 +84,16 @@ class AuthenticationServiceImplTest {
         requestRegister.setPassword("password123");
         requestRegister.setUsername("newuser");
 
+        UUID savedUserId = UUID.randomUUID();
         User savedUser = new User();
-        savedUser.setId(2L);
+        savedUser.setId(savedUserId);
         savedUser.setEmail("newuser@example.com");
         savedUser.setUsername("newuser");
         savedUser.setIsActive(false);
 
         when(userRepository.findByEmail("newuser@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("password123")).thenReturn("encodedPassword123");
+        when(applicationProperties.getIsDevMode()).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
         when(jwtService.generateToken(savedUser)).thenReturn("jwt-token");
         when(jwtService.generateRefreshToken(savedUser)).thenReturn("refresh-token");
@@ -94,11 +101,11 @@ class AuthenticationServiceImplTest {
         ResponseEntity<ResponseAuthentication> response = authenticationService.register(requestRegister);
 
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals("jwt-token", response.getBody().getAccessToken());
         assertEquals("refresh-token", response.getBody().getRefreshToken());
-        assertEquals(2L, response.getBody().getUserId());
+        assertEquals(savedUserId, response.getBody().getUserId());
         assertFalse(response.getBody().getIsActive());
 
         verify(userRepository).findByEmail("newuser@example.com");
@@ -134,17 +141,18 @@ class AuthenticationServiceImplTest {
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
+        when(tokenRepository.findAllByUserId(mockUser.getId())).thenReturn(List.of());
         when(jwtService.generateToken(mockUser)).thenReturn("jwt-token");
         when(jwtService.generateRefreshToken(mockUser)).thenReturn("refresh-token");
 
         ResponseEntity<ResponseAuthentication> response = authenticationService.authenticate(requestAuth);
 
         assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals("jwt-token", response.getBody().getAccessToken());
         assertEquals("refresh-token", response.getBody().getRefreshToken());
-        assertEquals(1L, response.getBody().getUserId());
+        assertEquals(mockUser.getId(), response.getBody().getUserId());
 
         verify(userRepository).findByEmail("test@example.com");
         verify(passwordEncoder).matches("password123", "encodedPassword");
@@ -179,7 +187,7 @@ class AuthenticationServiceImplTest {
         ResponseEntity<ResponseAuthentication> response = authenticationService.authenticate(requestAuth);
 
         assertNotNull(response);
-        assertEquals(400, response.getStatusCodeValue());
+        assertEquals(400, response.getStatusCode().value());
         assertNotNull(response.getBody());
 
         verify(userRepository).findByEmail("test@example.com");
@@ -204,7 +212,7 @@ class AuthenticationServiceImplTest {
 
         when(jwtService.getTokenInfo(token)).thenReturn(responseUser);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
-        when(tokenRepository.findAllByUserId(1L)).thenReturn(List.of(userToken));
+        when(tokenRepository.findAllByUserId(mockUser.getId())).thenReturn(List.of(userToken));
 
         ResponseOperation response = authenticationService.logout(token);
 
@@ -226,11 +234,12 @@ class AuthenticationServiceImplTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
         when(jwtService.isTokenValid("refresh-token", mockUser)).thenReturn(true);
         when(jwtService.generateToken(mockUser)).thenReturn("new-jwt-token");
+        when(tokenRepository.findAllByUserId(mockUser.getId())).thenReturn(List.of());
 
         ResponseEntity<ResponseAuthentication> result = authenticationService.refreshToken(request, response);
 
         assertNotNull(result);
-        assertEquals(200, result.getStatusCodeValue());
+        assertEquals(200, result.getStatusCode().value());
         assertNotNull(result.getBody());
         assertEquals("new-jwt-token", result.getBody().getAccessToken());
         assertEquals("refresh-token", result.getBody().getRefreshToken());
@@ -249,7 +258,7 @@ class AuthenticationServiceImplTest {
         ResponseEntity<ResponseAuthentication> result = authenticationService.refreshToken(request, response);
 
         assertNotNull(result);
-        assertEquals(400, result.getStatusCodeValue());
+        assertEquals(400, result.getStatusCode().value());
         assertNotNull(result.getBody());
 
         verify(jwtService, never()).extractUsername(anyString());
@@ -261,6 +270,7 @@ class AuthenticationServiceImplTest {
         requestConfirmation.setEmail("test@example.com");
         requestConfirmation.setCode(123456L);
 
+        mockUser.setIsActive(false);
         mockUser.setCode(123456L);
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
@@ -279,6 +289,7 @@ class AuthenticationServiceImplTest {
         requestConfirmation.setEmail("test@example.com");
         requestConfirmation.setCode(654321L);
 
+        mockUser.setIsActive(false);
         mockUser.setCode(123456L);
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
@@ -301,7 +312,7 @@ class AuthenticationServiceImplTest {
         ResponseEntity<Boolean> response = authenticationService.emailSendCode(email, isChangePassword);
 
         assertNotNull(response);
-        assertTrue(response.getBody());
+        assertEquals(Boolean.TRUE, response.getBody());
         verify(userRepository).save(mockUser);
         verify(emailService).sendEmail(email, mockUser.getCode(), isChangePassword);
     }
@@ -316,8 +327,8 @@ class AuthenticationServiceImplTest {
         ResponseEntity<Boolean> response = authenticationService.emailSendCode(email, isChangePassword);
 
         assertNotNull(response);
-        assertEquals(400, response.getStatusCodeValue());
-        assertFalse(response.getBody());
+        assertEquals(400, response.getStatusCode().value());
+        assertNotEquals(Boolean.TRUE, response.getBody());
         verify(userRepository, never()).save(any(User.class));
         verify(emailService, never()).sendEmail(anyString(), anyLong(), anyBoolean());
     }
@@ -346,19 +357,21 @@ class AuthenticationServiceImplTest {
     @Test
     void removeUser_withValidToken_removesUser() {
         String token = "Bearer valid-token";
+        UUID userId = mockUser.getId();
         ResponseUser responseUser = ResponseUser.builder()
                 .email("test@example.com")
                 .username("testuser")
-                .id(UUID.randomUUID())
+                .id(userId)
                 .build();
 
         when(jwtService.getTokenInfo(token)).thenReturn(responseUser);
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
+        when(noteRepository.findAllByUserId(userId)).thenReturn(List.of());
 
         authenticationService.removeUser(token);
 
         verify(jwtService).getTokenInfo(token);
-        verify(userRepository).findByEmail("test@example.com");
-        verify(userRepository).deleteById(mockUser.getId());
+        verify(noteRepository).findAllByUserId(userId);
+        verify(tokenRepository).deleteAllByUserId(userId);
+        verify(userRepository).deleteById(userId);
     }
 }

@@ -15,7 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -82,8 +82,8 @@ class NoteServiceImplTest {
         RequestNote requestNote = new RequestNote();
         requestNote.setText("Test note content");
         requestNote.setPath("/path/to/note");
-        requestNote.setCreatedAt(LocalDateTime.now());
-        requestNote.setLastUpdated(LocalDateTime.now());
+        requestNote.setCreatedAt(OffsetDateTime.now());
+        requestNote.setLastUpdated(OffsetDateTime.now());
 
         Note savedNote = createNote("Test note content");
         savedNote.setId(1L);
@@ -103,8 +103,8 @@ class NoteServiceImplTest {
         RequestNote requestNote = new RequestNote();
         requestNote.setText("Test content");
         requestNote.setPath("/test");
-        requestNote.setCreatedAt(LocalDateTime.now());
-        requestNote.setLastUpdated(LocalDateTime.now());
+        requestNote.setCreatedAt(OffsetDateTime.now());
+        requestNote.setLastUpdated(OffsetDateTime.now());
 
         Note savedNote = createNote("Test content");
         when(noteRepository.save(any(Note.class))).thenReturn(savedNote);
@@ -175,11 +175,11 @@ class NoteServiceImplTest {
     void getNotesSince_filtersByTimestamp() {
         when(jwtService.getTokenInfo(mockToken)).thenReturn(mockUser);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusDays(1);
+        OffsetDateTime timestamp = OffsetDateTime.now().minusDays(1);
         Note note1 = createNote("Note 1");
-        note1.setLastUpdated(LocalDateTime.now());
+        note1.setLastUpdated(OffsetDateTime.now());
         Note note2 = createNote("Note 2");
-        note2.setLastUpdated(LocalDateTime.now().minusDays(2));
+        note2.setLastUpdated(OffsetDateTime.now().minusDays(2));
 
         when(noteRepository.findAllByUserIdAndLastUpdatedAfter(mockUser.getId(), timestamp))
                 .thenReturn(List.of(note1));
@@ -202,8 +202,8 @@ class NoteServiceImplTest {
         requestNote.setId(existingId);
         requestNote.setText("Updated content");
         requestNote.setPath("/updated");
-        requestNote.setCreatedAt(LocalDateTime.now());
-        requestNote.setLastUpdated(LocalDateTime.now());
+        requestNote.setCreatedAt(OffsetDateTime.now());
+        requestNote.setLastUpdated(OffsetDateTime.now());
 
         when(noteRepository.findById(existingId)).thenReturn(Optional.of(existingNote));
         when(noteRepository.save(any(Note.class))).thenReturn(existingNote);
@@ -229,8 +229,8 @@ class NoteServiceImplTest {
         requestNote.setId(existingId);
         requestNote.setText("Updated");
         requestNote.setPath("/test");
-        requestNote.setCreatedAt(LocalDateTime.now());
-        requestNote.setLastUpdated(LocalDateTime.now());
+        requestNote.setCreatedAt(OffsetDateTime.now());
+        requestNote.setLastUpdated(OffsetDateTime.now());
 
         when(noteRepository.findById(existingId)).thenReturn(Optional.of(existingNote));
 
@@ -242,8 +242,8 @@ class NoteServiceImplTest {
         note.setText(text);
         note.setUserId(mockUser != null ? mockUser.getId() : UUID.randomUUID());
         note.setPath("/test/path");
-        note.setCreatedAt(LocalDateTime.now());
-        note.setLastUpdated(LocalDateTime.now());
+        note.setCreatedAt(OffsetDateTime.now());
+        note.setLastUpdated(OffsetDateTime.now());
         return note;
     }
 }

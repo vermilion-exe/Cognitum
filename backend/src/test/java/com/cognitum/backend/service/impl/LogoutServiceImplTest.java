@@ -14,10 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,7 +75,7 @@ class LogoutServiceImplTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer " + tokenValue);
         when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.of(token));
 
-        logoutService.logout(request, response, null);
+        logoutService.logout(request, new MockHttpServletResponse(), null);
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
@@ -119,8 +117,11 @@ class LogoutServiceImplTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer " + tokenValue);
         when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.empty());
 
-        assertDoesNotThrow(() -> logoutService.logout(request, response, null));
+        MockHttpServletResponse mockResponse = new MockHttpServletResponse();
 
+        assertDoesNotThrow(() -> logoutService.logout(request, mockResponse, null));
+
+        assertEquals(401, mockResponse.getStatus());
         verify(tokenRepository, never()).save(any());
     }
 
@@ -181,7 +182,10 @@ class LogoutServiceImplTest {
     void logout_withEmptyBearerPrefix_handlesGracefully() throws IOException {
         when(request.getHeader("Authorization")).thenReturn("Bearer ");
 
-        assertDoesNotThrow(() -> logoutService.logout(request, response, null));
+        MockHttpServletResponse mockResponse = new MockHttpServletResponse();
+
+        assertDoesNotThrow(() -> logoutService.logout(request, mockResponse, null));
+        assertEquals(401, mockResponse.getStatus());
     }
 
     @Test
@@ -194,7 +198,7 @@ class LogoutServiceImplTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer " + tokenValue);
         when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.of(token));
 
-        logoutService.logout(request, response, null);
+        logoutService.logout(request, new MockHttpServletResponse(), null);
 
         verify(tokenRepository).findByToken(tokenValue);
     }
@@ -211,7 +215,7 @@ class LogoutServiceImplTest {
         when(request.getHeader("Authorization")).thenReturn("Bearer " + tokenValue);
         when(tokenRepository.findByToken(tokenValue)).thenReturn(Optional.of(token));
 
-        logoutService.logout(request, response, null);
+        logoutService.logout(request, new MockHttpServletResponse(), null);
 
         ArgumentCaptor<Token> captor = ArgumentCaptor.forClass(Token.class);
         verify(tokenRepository).save(captor.capture());
