@@ -7,7 +7,7 @@ import { listenerCtx } from "@milkdown/plugin-listener";
 import { $prose, getMarkdown, replaceAll } from "@milkdown/kit/utils";
 import "katex/dist/katex.min.css";
 import { useActiveFile } from "../contexts/ActiveFileContext";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { selectionTooltipPlugin } from "../plugins/selectionTooltipPlugin";
 import { ResponseHighlight } from "../types/ResponseHighlight";
 import { editorViewCtx } from "@milkdown/core";
@@ -15,7 +15,9 @@ import { createHighlightPlugin, setFullReplaceMeta, setHighlightsMeta, setLoadin
 import { useSyncManager } from "../hooks/useSyncManager";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { RequestNote } from "../types/RequestNote";
-import { toRelativePath } from "../utils/fsUtils";
+import { findNodeShallow, toRelativePath } from "../utils/fsUtils";
+import { useFileTree } from "../contexts/FileTreeContext";
+import { join } from "@tauri-apps/api/path";
 
 const AUTOSAVE_DELAY_MS = 300;
 
@@ -44,6 +46,8 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
         const { scheduleSync } = useSyncManager();
         const { syncEnabled, currentNote, setCurrentNote, isNoteLoading } = useSyncStatus();
+        const { root } = useFileTree();
+        const rootRef = useRef(root);
         const syncEnabledRef = useRef(syncEnabled);
         const currentNoteRef = useRef(currentNote);
         const isNoteLoadingRef = useRef(false);
@@ -59,6 +63,8 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
         useEffect(() => { syncEnabledRef.current = syncEnabled }, [syncEnabled]);
         useEffect(() => { currentNoteRef.current = currentNote }, [currentNote]);
+
+        useEffect(() => { rootRef.current = root }, [root]);
 
         // useEffect(() => { activeFileIdRef.current = activeFileId }, [activeFileId]);
 
@@ -126,6 +132,30 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             const crepe = new Crepe({
                 root: hostRef.current,
                 defaultValue: "",
+                featureConfigs: {
+                    [Crepe.Feature.ImageBlock]: {
+                        onUpload: async (file: File) => {
+                            const buffer = await file.arrayBuffer();
+                            const node_path = await join(rootRef.current?.id!, file.name);
+                            const node = findNodeShallow(rootRef.current, node_path);
+                            if (node) {
+                                return convertFileSrc(node_path);
+                            }
+                            const path = await invoke<string>("upload_image", { fileName: file.name, bytes: Array.from(new Uint8Array(buffer)) });
+
+                            const url = convertFileSrc(path);
+
+                            if (syncEnabled) {
+                                const id = crypto.randomUUID();
+                                scheduleSync(`attachment-${id}`, {
+                                    type: "attachment", operation: "create", id: String(id), payload: path
+                                });
+                            }
+
+                            return url;
+                        }
+                    }
+                }
             });
 
             crepe.editor.config((ctx => {

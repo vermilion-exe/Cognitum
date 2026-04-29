@@ -8,3 +8,4 @@ export { default as ExplanationAccordion } from './ExplanationAccordion.tsx';
 export { default as EditorOptionScreen } from './EditorOptionScreen.tsx';
 export { default as FileCreationModal } from './FileCreationModal.tsx';
 export { default as Manual } from './Manual.tsx';
+export { default as FileView } from './FileView.tsx';

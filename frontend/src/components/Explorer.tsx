@@ -10,12 +10,15 @@ import { join } from "@tauri-apps/api/path";
 import { useSyncManager } from '../hooks/useSyncManager';
 import { invoke } from '@tauri-apps/api/core';
 import { useSyncStatus } from '../contexts/SyncContext';
+import { ExplorerContextMenu } from './ExplorerContextMenu';
+import { ContextMenuOption } from '../types/ContextMenuOption';
 
 function Explorer() {
     const [createType, setCreateType] = useState<String>();
     const [nodeName, setNodeName] = useState<string>("");
     const { root, setRoot, createNode } = useFileTree();
     const [isDragOver, setIsDragOver] = useState(false);
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
     const { scheduleSync } = useSyncManager();
     const { syncEnabled } = useSyncStatus();
     const toast = useToast();
@@ -55,6 +58,31 @@ function Explorer() {
         setNodeName("");
     };
 
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+    }
+
+    const handleNewFile = async () => {
+        createNode(root?.id!, "Untitled", false);
+    }
+
+    const handleNewDir = async () => {
+        createNode(root?.id!, "Untitled", true);
+    }
+
+    const contextOptions: ContextMenuOption[] = [
+        {
+            label: "New File",
+            onClick: async () => (await handleNewFile()),
+        },
+        {
+            label: "New Folder",
+            onClick: async () => (await handleNewDir()),
+        },
+    ];
+
     const moveNotes = async (node: FsNode, parentPath: string) => {
         if (node.kind === "dir") {
             await Promise.all((node.children ?? []).map(async (child) => {
@@ -87,7 +115,8 @@ function Explorer() {
         const draggedNode = dragState.node;
 
         // Already in root
-        if (draggedNode.id.replace(/\\[^\\]+$/, "") === targetId) {
+        console.log(findNodeShallow(root, draggedNode.id));
+        if (findNodeShallow(root, draggedNode.id)) {
             setIsDragOver(false);
             return;
         }
@@ -130,7 +159,7 @@ function Explorer() {
 
     return (
         <div className='flex flex-col h-full'>
-            <div className='h-12.5 bg-background-secondary' data-tauri-drag-region />
+            <div className='h-9 bg-background-secondary' data-tauri-drag-region />
             <div className="flex justify-center py-2 gap-3">
                 <button aria-label='CreateFile'><img src={addFileIcon} onClick={onCreateFile} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
                 <button aria-label='CreateDirectory'><img src={addDirectoryIcon} onClick={onCreateDirectory} className='w-7 h-7 hover:bg-background-secondary rounded-md' /></button>
@@ -159,10 +188,18 @@ function Explorer() {
                 data-drop-id={root?.id}
                 data-drop-kind="dir"
                 data-drag-over="false"
+                onContextMenu={handleContextMenu}
                 onPointerUp={handleSpacerPointerUp}
                 onPointerEnter={() => { if (dragState) setIsDragOver(true); }}
                 onPointerLeave={() => setIsDragOver(false)}>
             </div>
+            {contextMenu && (
+                <ExplorerContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    options={contextOptions}
+                    onClose={() => setContextMenu(null)} />
+            )}
         </div>
     );
 }

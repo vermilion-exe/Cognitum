@@ -53,16 +53,26 @@ function TitleBar({ isAuth, }: { isAuth: boolean; }) {
                         {
                             openFileNodes && openFileNodes.map((file, index) => {
                                 if (file.id === activeFileId) {
-                                    return (<button key={index} className="active-tab">{file.name}
-                                        <img src={closeIcon}
-                                            aria-label={file.name + "_close"}
-                                            className='w-4 h-4'
-                                            onClick={() => closeFile(file.id)} />
-                                    </button>)
+                                    return (
+                                        <button key={index} className="active-tab">
+                                            <span className='truncate'>
+                                                {file.name}
+                                            </span>
+                                            <img src={closeIcon}
+                                                aria-label={file.name + "_close"}
+                                                className='w-4 h-4'
+                                                onClick={() => closeFile(file.id)} />
+                                        </button>)
                                 }
                                 else {
-                                    return (<button key={index} className="group tab" onClick={() => setActiveFileId(file.id)}>{file.name}<img src={closeIcon} onClick={(e) => { e.stopPropagation(); closeFile(file.id); }}
-                                        className='w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity' /></button>)
+                                    return (
+                                        <button key={index} className="group tab" onClick={() => setActiveFileId(file.id)}>
+                                            <span className='truncate'>
+                                                {file.name}
+                                            </span>
+                                            <img src={closeIcon} onClick={(e) => { e.stopPropagation(); closeFile(file.id); }}
+                                                className='w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity' />
+                                        </button>)
                                 }
                             })
                         }

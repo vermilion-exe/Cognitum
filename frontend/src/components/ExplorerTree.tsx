@@ -151,16 +151,25 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
     }
 
     const isDescendant = (parentId: string, childId: string): boolean => {
-        return childId.startsWith(parentId + "/");
+        return childId.startsWith(parentId + "\\");
     }
 
     const performDrop = async (targetId: string) => {
         if (!dragState) return;
 
         const draggedNode = findNode(root, dragState.nodeId);
+        const base = draggedNode?.kind === "file"
+            ? draggedNode?.id.slice(0, -(`${draggedNode?.name}.md`.length))
+            : draggedNode?.id.slice(0, -(draggedNode?.name.length));
+
         if (!draggedNode) return;
         else if (draggedNode.id === targetId) return;
-        else if (isDescendant(draggedNode.id, targetId)) return;
+        else if (targetId === root?.id) {
+            if (targetId === base) return;
+        }
+        else {
+            if (isDescendant(targetId, draggedNode.id)) return;
+        }
 
         const newPath = `${targetId}\\${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`;
 

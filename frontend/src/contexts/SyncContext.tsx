@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { SyncStatus } from "../types/SyncStatus";
 import { RequestNote } from "../types/RequestNote";
 import { useActiveFile } from "./ActiveFileContext";
-import { collectAllNodes, toRelativePath } from "../utils/fsUtils";
+import { collectAllNodes, isImage, toRelativePath } from "../utils/fsUtils";
 import { invoke } from "@tauri-apps/api/core";
 import { useUser } from "./UserContext";
 import { ResponseSummary } from "../types/ResponseSummary";
@@ -15,6 +15,7 @@ import { useToast } from "../hooks/useToast";
 import { FsNode } from "../types/FsNode";
 import { useVault } from "./VaultContext";
 import { ResponseFlashcard } from "../types/ResponseFlashcard";
+import { ResponseAttachment } from "../types/ResponseAttachment";
 
 type SyncContextType = {
     status: SyncStatus;
@@ -164,6 +165,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         try {
             console.log("Getting notes from DB.");
             const db_notes = await invoke<RequestNote[]>("get_all_notes");
+            const db_images = await invoke<ResponseAttachment[]>("get_attachments");
 
             console.log("Getting local notes.");
             const children = await invoke<FsNode[]>("scan_dir", {
@@ -180,7 +182,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             });
 
             let nodes = collectAllNodes(children);
-            nodes = nodes.filter((node) => node.kind === "file");
+            const images = nodes.filter((node) => isImage(root, node.id));
+
+            nodes = nodes.filter((node) => node.kind === "file" && node.extension === "md");
             const nodes_with_paths = await Promise.all(
                 nodes.map(async (node) => ({
                     node,
@@ -200,11 +204,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 const fullPath = await getNoteFullPath(note.path);
 
                 // If the local note is newer
-                if (matchedNode && (new Date(matchedNode.node.lastModified) > new Date(note.last_updated))) {
+                if (matchedNode && (new Date(matchedNode.node.lastModified!) > new Date(note.last_updated))) {
                     console.log("Local note is newer for note with path", note.path);
                     // Create the note in DB
                     const text = await getNoteText(note.path);
-                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: new Date(matchedNode.node.lastModified).toISOString() } });
+                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: new Date(matchedNode.node.lastModified!).toISOString() } });
 
                     // Push the local summary, if exists
                     const summary = await invoke<String | null>("get_local_summary", { fileId: matchedNode.node.id });
@@ -269,7 +273,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                     console.log("Uploaded local note to DB");
                 }
                 // If the database note is newer
-                else if (matchedNode && (new Date(matchedNode.node.lastModified) < new Date(note.last_updated))) {
+                else if (matchedNode && (new Date(matchedNode.node.lastModified!) < new Date(note.last_updated))) {
                     console.log("DB note is newer for note with path", note.path);
                     if (activeFileId === fullPath)
                         setActiveFileId(undefined);
@@ -356,6 +360,38 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
                 await invoke("save_sync_progress", { progress });
                 console.log("saved progress");
+            }));
+
+            const images_with_paths = await Promise.all(
+                images.map(async (image) => ({
+                    image,
+                    relativePath: await toRelativePath(image.id),
+                }))
+            );
+
+            await Promise.all(db_images.map(async (image) => {
+                const matchedImage = images_with_paths.find(
+                    ({ relativePath }) => relativePath === image.path
+                );
+
+                // Local image is newer
+                if (matchedImage && (new Date(matchedImage.image.lastModified!) > new Date(image.last_updated))) {
+                    const lastModified = !matchedImage.image.lastModified ? null : new Date(matchedImage.image.lastModified).toISOString();
+                    await invoke("create_attachment", { request: { file_path: matchedImage.image.id, relative_path: image.path, last_updated: lastModified } });
+                }
+                else if (matchedImage && (new Date(matchedImage.image.lastModified!) > new Date(image.last_updated))) {
+                    await invoke("delete_file", { path: matchedImage.image.id });
+                    await invoke("create_image", { path: matchedImage.image.id, contents: image.bytes });
+                }
+            }));
+
+            await Promise.all(images_with_paths.map(async (image_with_path) => {
+                const db_exists = db_images.some(image => image.path === image_with_path.relativePath);
+
+                if (!db_exists) {
+                    const lastModified = !image_with_path.image.lastModified ? null : new Date(image_with_path.image.lastModified).toISOString();
+                    await invoke("create_attachment", { request: { file_path: image_with_path.image.id, relative_path: image_with_path.relativePath, last_updated: lastModified } });
+                }
             }));
 
             setLastSyncTimestamp(Date.now());

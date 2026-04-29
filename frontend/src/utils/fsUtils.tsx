@@ -51,3 +51,20 @@ export async function toRelativePath(fullPath?: string) {
 
     return normalised?.startsWith(base) ? normalised.slice(base.length).replace(/^\//, "").toString() : fullPath;
 }
+
+export function isImage(root: FsNode | undefined, path: string) {
+    const node = findNode(root, path);
+    if (!node?.extension) return;
+
+    const imageExtensions = ["apng", "png", "avif", "gif", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "svg", "webp"];
+
+    return imageExtensions.includes(node?.extension);
+}
+
+export function isImageNode(node: FsNode) {
+    if (!node?.extension) return;
+
+    const imageExtensions = ["apng", "png", "avif", "gif", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "svg", "webp"];
+
+    return imageExtensions.includes(node?.extension);
+}

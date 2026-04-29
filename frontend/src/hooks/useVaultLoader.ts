@@ -30,8 +30,7 @@ export function useVaultLoader({ setRoot, redirectIfNoVault }: { setRoot: (root:
                     cfg.vaultPath.split(/[\\/]/).filter(Boolean).pop() ??
                     cfg.vaultPath,
                 kind: "dir",
-                children,
-                lastModified: Date.now()
+                children
             });
         })();
 
