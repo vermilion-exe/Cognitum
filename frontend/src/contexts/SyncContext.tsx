@@ -28,7 +28,7 @@ type SyncContextType = {
     setIsNoteLoading: (loading: boolean) => void;
     lastSyncTimestamp: number | null;
     triggerFullSync: () => Promise<void>;
-    fetchUpdates: () => Promise<void>;
+    fetchUpdates: (timestampOverride?: number | null) => Promise<void>;
 };
 
 const SyncContext = createContext<SyncContextType>({
@@ -48,8 +48,9 @@ const SyncContext = createContext<SyncContextType>({
 export function SyncProvider({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<SyncStatus>("idle");
     const [syncEnabled, setSyncEnabled] = useState(false);
+    const [syncLoaded, setSyncLoaded] = useState(false);
     const [currentNote, setCurrentNote] = useState<RequestNote | null>(null);
-    const { root, setRoot } = useVault();
+    const { root, setRoot, markAppFileWrite } = useVault();
     const [isNoteLoading, setIsNoteLoading] = useState(false);
     const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number | null>(null);
     const { scheduleSync } = useSyncManager();
@@ -66,7 +67,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
         catch {
             const text = await invoke("read_file", { path: activeFileId! });
-            const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: text, path: relativePath } });
+            const now = new Date().toISOString();
+            const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: text, path: relativePath, created_at: now, last_updated: now } });
             setCurrentNote(createdNote);
         }
         finally {
@@ -77,22 +79,30 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         async function loadSyncEnabled() {
             if (!user) return;
+            console.log("loading sync enabled");
             const cfg = await invoke<{ syncEnabled?: boolean }>("load_config");
+            console.log(cfg.syncEnabled);
             if (cfg.syncEnabled) {
                 setSyncEnabled(cfg.syncEnabled);
             }
+            else {
+                await invoke("delete_sync_data");
+            }
+            setSyncLoaded(true);
         }
 
         loadSyncEnabled();
-    }, []);
+    }, [user]);
 
     useEffect(() => {
+        if (!syncLoaded) return;
+
         async function saveSyncEnabled() {
             await invoke("save_sync_enabled", { syncEnabled: syncEnabled });
         }
 
         saveSyncEnabled();
-    }, [syncEnabled]);
+    }, [syncEnabled, syncLoaded]);
 
     useEffect(() => {
         if (!activeFileId || !syncEnabled || status === "syncing") {
@@ -131,8 +141,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }, [lastSyncTimestamp]);
 
     const handleSync = async () => {
-        const timestamp = await invoke<number>("load_sync_timestamp");
-        setLastSyncTimestamp(new Date(timestamp).getTime());
+        const timestamp = await invoke<string | null>("load_sync_timestamp");
+        const loadedTimestamp = timestamp ? new Date(timestamp).getTime() : null;
+        setLastSyncTimestamp(loadedTimestamp);
 
         if (!timestamp || timestamp === null) {
             console.log("No previous sync, performing full sync.");
@@ -148,7 +159,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
         else {
             console.log("Sync timestamp found, fetching updates.");
-            await fetchUpdates();
+            await fetchUpdates(loadedTimestamp);
             await replayOfflineQueue();
         }
     }
@@ -201,14 +212,17 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 const matchedNode = nodes_with_paths.find(
                     ({ relativePath }) => relativePath === note.path
                 );
-                const fullPath = await getNoteFullPath(note.path);
+                const fullPath = await getFullPath(note.path);
+
+                const localTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: fullPath });
+                const localLastUpdated = localTimestamp ? new Date(localTimestamp) : (matchedNode?.node.lastModified ? new Date(matchedNode?.node.lastModified) : null);
 
                 // If the local note is newer
-                if (matchedNode && (new Date(matchedNode.node.lastModified!) > new Date(note.last_updated))) {
+                if (matchedNode && localLastUpdated && localLastUpdated > new Date(note.last_updated)) {
                     console.log("Local note is newer for note with path", note.path);
                     // Create the note in DB
                     const text = await getNoteText(note.path);
-                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: new Date(matchedNode.node.lastModified!).toISOString() } });
+                    await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: localTimestamp } });
 
                     // Push the local summary, if exists
                     const summary = await invoke<String | null>("get_local_summary", { fileId: matchedNode.node.id });
@@ -273,15 +287,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                     console.log("Uploaded local note to DB");
                 }
                 // If the database note is newer
-                else if (matchedNode && (new Date(matchedNode.node.lastModified!) < new Date(note.last_updated))) {
+                else if ((matchedNode && localLastUpdated && (localLastUpdated < new Date(note.last_updated))) || !matchedNode || !localLastUpdated) {
                     console.log("DB note is newer for note with path", note.path);
                     if (activeFileId === fullPath)
                         setActiveFileId(undefined);
-                    await invoke("create_file", { path: await getNoteFullPath(note.path), contents: note.text });
+                    markAppFileWrite(fullPath!);
+                    await invoke("create_file", { path: fullPath, contents: note.text });
+
+                    await invoke("save_note_timestamp", { path: fullPath, timestamp: note.last_updated });
 
                     try {
                         const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
-                        await invoke("save_summary", { summary: summary });
+                        await invoke("save_summary", { fileId: fullPath, summary: summary.summary });
                     }
                     catch (_) { }
 
@@ -310,9 +327,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                     console.log("Note does not exist in DB with path", node_with_path.relativePath);
                     const text = await getNoteText(node_with_path.relativePath!);
 
-                    const last_modified = !node_with_path.node.lastModified ? null : new Date(node_with_path.node.lastModified).toISOString();
+                    const localTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: node_with_path.node.id });
                     const createdNote = await invoke<RequestNote>("create_note",
-                        { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: last_modified } });
+                        { request: { id: null, text: text, path: node_with_path.relativePath, created_at: new Date().toISOString(), last_updated: localTimestamp } });
 
                     console.log("created note");
 
@@ -379,9 +396,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                     const lastModified = !matchedImage.image.lastModified ? null : new Date(matchedImage.image.lastModified).toISOString();
                     await invoke("create_attachment", { request: { file_path: matchedImage.image.id, relative_path: image.path, last_updated: lastModified } });
                 }
-                else if (matchedImage && (new Date(matchedImage.image.lastModified!) > new Date(image.last_updated))) {
-                    await invoke("delete_file", { path: matchedImage.image.id });
-                    await invoke("create_image", { path: matchedImage.image.id, contents: image.bytes });
+                else if ((matchedImage && (new Date(matchedImage.image.lastModified!) < new Date(image.last_updated))) || !matchedImage) {
+                    const fullPath = matchedImage ? matchedImage.image.id : await getFullPath(image.path);
+                    if (matchedImage) await invoke("delete_file", { path: fullPath });
+                    await invoke("create_image", { path: fullPath, contents: image.bytes });
                 }
             }));
 
@@ -403,27 +421,72 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const fetchUpdates = async () => {
+    const fetchUpdates = async (timestampOverride?: number | null) => {
         if (!user) return;
-        if (!lastSyncTimestamp || lastSyncTimestamp === null || lastSyncTimestamp === 0) return;
+        const syncTimestamp = timestampOverride ?? lastSyncTimestamp;
+        if (!syncTimestamp || syncTimestamp === null || syncTimestamp === 0) return;
         setStatus("syncing");
 
         try {
-            const since = new Date(lastSyncTimestamp!).toISOString();
+            const since = new Date(syncTimestamp).toISOString();
             const new_notes = await invoke<RequestNote[]>("get_notes_since", { since: since });
+            const children = root?.id ? await invoke<FsNode[]>("scan_dir", {
+                path: root.id,
+                recursive: true,
+            }) : [];
+            const nodes_with_paths = await Promise.all(
+                collectAllNodes(children)
+                    .filter((node) => node.kind === "file" && node.extension === "md")
+                    .map(async (node) => ({
+                        node,
+                        relativePath: await toRelativePath(node.id),
+                    }))
+            );
+
+            if (root) {
+                setRoot({
+                    id: root.id,
+                    name: root.name,
+                    kind: "dir",
+                    children,
+                    lastModified: root.lastModified
+                });
+            }
 
             await Promise.all(new_notes.map(async (note) => {
-                const fullPath = await getNoteFullPath(note.path);
+                const fullPath = await getFullPath(note.path);
+                const matchedNode = nodes_with_paths.find(
+                    ({ relativePath }) => relativePath === note.path
+                );
 
+                const localTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: fullPath });
+                const localLastUpdated = localTimestamp ? new Date(localTimestamp) : (matchedNode?.node.lastModified ? new Date(matchedNode?.node.lastModified) : null);
+                if (matchedNode && localLastUpdated && localLastUpdated > new Date(note.last_updated)) {
+                    const text = await invoke<string>("read_file", { path: fullPath });
+
+                    await invoke<RequestNote>("create_note", {
+                        request: { ...note, text, last_updated: localTimestamp }
+                    });
+                    return;
+                }
+
+                markAppFileWrite(fullPath!);
                 await invoke("create_file", { path: fullPath, contents: note.text });
-                await invoke("save_note_metadata", { path: note.path, note: note });
+                await invoke("save_note_timestamp", { path: fullPath, timestamp: note.last_updated });
 
-                const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
-                await invoke("save_summary", { summary: summary });
+                try {
+                    const summary = await invoke<ResponseSummary>("get_summary_by_note_id", { noteId: note.id });
+                    await invoke("save_summary", { fileId: fullPath, summary: summary.summary });
+                }
+                catch (_) { }
 
                 const highlights = await invoke<ResponseHighlight[]>("get_explanations_by_note_id", { noteId: note.id });
                 await invoke("remove_local_highlights", { fileId: fullPath });
                 await invoke("save_highlights", { fileId: fullPath, highlights });
+
+                const flashcards = await invoke<ResponseFlashcard[]>("get_flashcards_by_note_id", { noteId: note.id });
+                await invoke("remove_local_flashcards", { fileId: fullPath });
+                await invoke("save_local_flashcards", { fileId: fullPath, flashcards });
             }));
 
             setLastSyncTimestamp(Date.now());
@@ -436,10 +499,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     const getNoteText = async (path: string) => {
-        return await invoke("read_file", { path: await getNoteFullPath(path) });
+        return await invoke("read_file", { path: await getFullPath(path) });
     }
 
-    const getNoteFullPath = async (relativePath: string) => {
+    const getFullPath = async (relativePath: string) => {
         const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
         if (cfg.vaultPath) {

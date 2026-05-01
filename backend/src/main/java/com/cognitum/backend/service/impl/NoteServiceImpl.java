@@ -38,6 +38,9 @@ public class NoteServiceImpl implements NoteService {
         ResponseUser user = jwtService.getTokenInfo(token);
 
         Note note = new Note();
+        OffsetDateTime requestLastUpdated = request.getLastUpdated() != null
+                ? request.getLastUpdated()
+                : OffsetDateTime.now();
 
         if (request.getId() != null) {
             Note existingNote = noteRepository.findById(request.getId())
@@ -45,6 +48,10 @@ public class NoteServiceImpl implements NoteService {
 
             if (!existingNote.getUserId().equals(user.getId())) {
                 throw new UnauthorizedException("Cannot modify another user's note");
+            }
+
+            if (existingNote.getLastUpdated() != null && requestLastUpdated.isBefore(existingNote.getLastUpdated())) {
+                return new ResponseNote(existingNote.getId(), existingNote.getText(), existingNote.getPath(), existingNote.getCreatedAt(), existingNote.getLastUpdated());
             }
 
             note.setFlashcards(existingNote.getFlashcards());
@@ -55,12 +62,18 @@ public class NoteServiceImpl implements NoteService {
         note.setText(request.getText());
         note.setPath(request.getPath());
         note.setUserId(user.getId());
-        note.setCreatedAt(request.getCreatedAt());
-        note.setLastUpdated(request.getLastUpdated());
+        note.setCreatedAt(request.getCreatedAt() != null ? request.getCreatedAt() : OffsetDateTime.now());
+        note.setLastUpdated(requestLastUpdated);
 
         Note savedNote = noteRepository.save(note);
 
         return new ResponseNote(savedNote.getId(), savedNote.getText(), savedNote.getPath(), savedNote.getCreatedAt(), savedNote.getLastUpdated());
+    }
+
+    @Override
+    public void updateNoteTimestamp(Note note) {
+        note.setLastUpdated(OffsetDateTime.now());
+        noteRepository.save(note);
     }
 
     @Override

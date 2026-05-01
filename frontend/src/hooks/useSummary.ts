@@ -6,6 +6,7 @@ import { useSyncManager } from "./useSyncManager";
 import { renderMarkdownWithLatex } from "../utils/markdownUtils";
 import { RequestSummary } from "../types/RequestSummary";
 import { useActiveFile } from "../contexts/ActiveFileContext";
+import { updateNoteTimestamp } from "../utils/fsUtils";
 
 const MIN_CHARS = 300;
 
@@ -112,6 +113,7 @@ export function useSummary({ markdownRef, markdown }: { markdownRef: RefObject<s
             .then(async (result) => {
                 setFullText(result.summary);
                 await invoke("save_summary", { summary: result.summary, fileId: activeFileId });
+                await updateNoteTimestamp(activeFileId);
             })
             .catch((e) => {
                 console.error("Command failed: ", e);

@@ -7,6 +7,7 @@ import { useSyncStatus } from "../contexts/SyncContext";
 import { calculate } from "../utils/sm2";
 import { useSyncManager } from "./useSyncManager";
 import { useToast } from "./useToast";
+import { updateNoteTimestamp } from "../utils/fsUtils";
 
 const DEBOUNCE_MS = 2000;
 const POLL_INTERVAL_MS = 30000;
@@ -100,6 +101,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
                 console.log("saving flashcards after generation");
 
                 await invoke("save_local_flashcards", { fileId: activeFileIdRef.current!, flashcards: generated_flashcards });
+                await updateNoteTimestamp(activeFileIdRef.current);
                 setFlashcards(generated_flashcards);
             }
             else {
@@ -125,6 +127,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
             const updatedFlashcards = flashcardsRef.current.map((f) => irrelevantIds.includes(f.id) ? { ...f, is_stale: true } : f);
 
             await invoke("save_local_flashcards", { fileId: activeFileIdRef.current!, flashcards: updatedFlashcards });
+            await updateNoteTimestamp(activeFileIdRef.current);
 
             if (syncEnabled)
                 await invoke("update_stale_flashcards", { noteId: currentNote?.id!, flashcardIds: irrelevantIds });
@@ -181,6 +184,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         finally {
             console.log("Saving updated flashcards locally:", updatedFlashcards);
             await invoke("save_local_flashcards", { fileId: fileId, flashcards: updatedFlashcards });
+            await updateNoteTimestamp(activeFileIdRef.current);
         }
     }
 
@@ -197,6 +201,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
 
         let updatedFlashcards = currentFlashcards.filter((f) => f.id !== flashcardId);
         await invoke("save_local_flashcards", { fileId: fileId, flashcards: updatedFlashcards });
+        await updateNoteTimestamp(activeFileIdRef.current);
 
         if (syncEnabled) {
             const id = crypto.randomUUID();
@@ -228,6 +233,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
                 { type: "flashcard", operation: "create", id: String(id), payload: [...updatedFlashcards.map((f) => ({ ...f, note_id: currentNoteRef.current?.id! }))] });
         }
         await invoke("save_local_flashcards", { fileId: fileId, flashcards: updatedFlashcards });
+        await updateNoteTimestamp(activeFileIdRef.current);
     }
 
     const flushPersistedQueue = useCallback(async () => {
@@ -290,6 +296,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
                     const updatedFlashcards = flashcardsRef.current.map((f) =>
                         f.id === reviewedFlashcard.id ? reviewedFlashcard : f);
                     await invoke("save_local_flashcards", { fileId: activeFileIdRef?.current!, flashcards: updatedFlashcards });
+                    await updateNoteTimestamp(activeFileIdRef.current);
 
                     if (syncEnabled)
                         await invoke("save_review_queue", { queue: Object.fromEntries(Array.from(reviewQueue.current.entries()).map(([k, v]) => [k.toString(), v])) });

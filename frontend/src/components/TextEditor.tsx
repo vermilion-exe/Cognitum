@@ -42,6 +42,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         const activeFileIdRef = useRef<string | undefined>(null);
         const { activeFileId } = useActiveFile();
+        const { markAppFileWrite } = useFileTree();
         const highlightsRef = useRef<ResponseHighlight[]>(initialHighlights);
         const explanationLoadingRef = useRef<boolean>(isExplanationLoading);
         const { scheduleSync } = useSyncManager();
@@ -99,6 +100,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                     const fileId = activeFileIdRef.current;
                     if (!fileId) return;
                     try {
+                        markAppFileWrite(fileId);
                         await invoke("create_file", { path: fileId, contents: content });
                     }
                     catch (e) {
@@ -119,6 +121,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                 if (!view || view.isDestroyed) return;
 
                 const content = crepeRef.current.editor.action(getMarkdown());
+                markAppFileWrite(targetId);
                 await invoke("create_file", { path: targetId, contents: content });
             }
             catch (e) {
@@ -145,7 +148,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
                             const url = convertFileSrc(path);
 
-                            if (syncEnabled) {
+                            if (syncEnabledRef.current) {
                                 const id = crypto.randomUUID();
                                 scheduleSync(`attachment-${id}`, {
                                     type: "attachment", operation: "create", id: String(id), payload: path
@@ -162,16 +165,19 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                 ctx.get(listenerCtx).markdownUpdated(async (_ctx, markdown) => {
                     scheduleAutosave(markdown);
                     cbRef.current.onMarkdownChange?.(markdown);
+                    const lastUpdated = new Date().toISOString();
+                    await invoke("save_note_timestamp", { path: activeFileIdRef.current, timestamp: lastUpdated });
 
-                    if (!syncEnabled) return;
+                    if (!syncEnabledRef.current) return;
 
                     console.log("The markdown changed");
                     if (!currentNoteRef.current && !isCreatingNoteRef.current && !isNoteLoadingRef.current) {
                         isCreatingNoteRef.current = true;
                         try {
                             const path = await toRelativePath(activeFileIdRef.current!);
+                            const now = new Date().toISOString();
 
-                            const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: markdown, path: path } });
+                            const createdNote = await invoke<RequestNote>("create_note", { request: { id: null, text: markdown, path: path, created_at: now, last_updated: now } });
                             setCurrentNote(createdNote);
                         }
                         catch (e) {
@@ -189,9 +195,9 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                     scheduleSync(`create-note-${currentNoteRef.current?.id}`,
                         {
                             type: "note", operation: "create", id: String(currentNoteRef.current?.id),
-                            payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path, created_at: currentNoteRef.current?.created_at, last_updated: currentNoteRef.current?.last_updated }
+                            payload: { id: currentNoteRef.current?.id, text: markdown, path: currentNoteRef.current?.path, created_at: currentNoteRef.current?.created_at, last_updated: lastUpdated }
                         });
-                    setCurrentNote({ ...currentNoteRef.current, text: markdown });
+                    setCurrentNote({ ...currentNoteRef.current, text: markdown, last_updated: lastUpdated });
                     isCreatingNoteRef.current = false;
                 })
             }))

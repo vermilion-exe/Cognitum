@@ -214,21 +214,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         return ResponseEntity.ok().body(true);
     }
-//
-//    @Override
-//    public ResponseEntity<Boolean> changeUsername(String token, RequestChangeUsername changeUsername) {
-//        ResponseUser user = jwtService.getTokenInfo(token);
-//        Optional<User> userOptional = userRepository.findByEmail(user.getEmail());
-//
-//        if(userOptional.isEmpty()){
-//            return ResponseEntity.badRequest().body(false);
-//        }
-//
-//        userOptional.get().setUsername(changeUsername.getUsername());
-//        userRepository.save(userOptional.get());
-//
-//        return ResponseEntity.ok().body(true);
-//    }
 
     @Override
     public ResponseUserInfo getUser(String token) {

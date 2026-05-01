@@ -68,3 +68,8 @@ export function isImageNode(node: FsNode) {
 
     return imageExtensions.includes(node?.extension);
 }
+
+export async function updateNoteTimestamp(fileId: string | undefined) {
+    if (!fileId) return;
+    await invoke("save_note_timestamp", { path: fileId, timestamp: new Date().toISOString() });
+}

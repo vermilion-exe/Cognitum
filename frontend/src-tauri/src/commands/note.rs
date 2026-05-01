@@ -9,14 +9,7 @@ use crate::{
     AppState,
 };
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
-
-#[derive(Serialize, Deserialize)]
-pub struct NoteUpdate {
-    note: RequestNote,
-    timestamp: u64,
-}
 
 #[tauri::command]
 pub async fn get_note_by_path(
@@ -76,7 +69,7 @@ pub async fn get_all_notes(state: tauri::State<'_, AppState>) -> Result<Vec<Requ
 pub async fn get_notes_since(
     since: DateTime<Utc>,
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<NoteUpdate>, String> {
+) -> Result<Vec<RequestNote>, String> {
     let url = format!("{}/note/since", &state.base_url);
     let params = [("timestamp", since.to_rfc3339())];
 
@@ -134,10 +127,10 @@ pub async fn delete_note(
 }
 
 #[tauri::command]
-pub async fn save_note_metadata(
+pub async fn save_note_timestamp(
     app: AppHandle,
     path: String,
-    note: RequestNote,
+    timestamp: DateTime<Utc>,
 ) -> Result<(), String> {
     let mappings_path = app
         .path()
@@ -152,15 +145,10 @@ pub async fn save_note_metadata(
         HashMap::new()
     };
 
-    let mut note_json: serde_json::Value =
-        serde_json::to_value(&note).map_err(|e| e.to_string())?;
-
-    if let serde_json::Value::Object(ref mut map) = note_json {
-        map.remove("text");
-    }
-
-    let note_json = serde_json::to_string_pretty(&note_json).map_err(|e| e.to_string())?;
-    mappings.insert(path, note_json);
+    mappings.insert(
+        path,
+        serde_json::to_string(&timestamp).map_err(|e| e.to_string())?,
+    );
 
     if let Some(parent) = mappings_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -171,7 +159,10 @@ pub async fn save_note_metadata(
 }
 
 #[tauri::command]
-pub async fn get_local_notes(app: AppHandle) -> Result<Option<Vec<RequestNote>>, String> {
+pub async fn get_local_note_timestamp(
+    app: AppHandle,
+    path: String,
+) -> Result<Option<DateTime<Utc>>, String> {
     let mappings_path = app
         .path()
         .app_data_dir()
@@ -185,30 +176,34 @@ pub async fn get_local_notes(app: AppHandle) -> Result<Option<Vec<RequestNote>>,
         return Ok(None);
     };
 
-    mappings
-        .values()
-        .map(|v| serde_json::from_str(v).map_err(|e| e.to_string()))
-        .collect()
+    let Some(metadata) = mappings.get(&path) else {
+        return Ok(None);
+    };
+
+    serde_json::from_str(metadata).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn get_local_note(app: AppHandle, path: String) -> Result<Option<RequestNote>, String> {
+pub async fn remove_local_note_timestamp(app: AppHandle, path: String) -> Result<(), String> {
     let mappings_path = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("note_metadata.json");
 
-    let mappings: HashMap<String, String> = if mappings_path.exists() {
+    let mut mappings: HashMap<String, String> = if mappings_path.exists() {
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
-        return Ok(None);
+        return Ok(());
     };
 
-    let metadata = mappings
-        .get(&path)
-        .ok_or_else(|| "Note metadata not found".to_string())?;
+    mappings.remove(&path);
 
-    serde_json::from_str(&metadata).map_err(|e| e.to_string())?
+    if let Some(parent) = mappings_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let json = serde_json::to_string_pretty(&mappings).map_err(|e| e.to_string())?;
+    fs::write(&mappings_path, json).map_err(|e| e.to_string())
 }

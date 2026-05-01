@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useActiveFile } from "../contexts/ActiveFileContext";
 import { ResponseExplanation } from "../types/ResponseExplanation";
 import { TextEditorHandle } from "../components/TextEditor";
+import { updateNoteTimestamp } from "../utils/fsUtils";
 
 export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHandle | null> }) {
     const [highlights, setHighlights] = useState<ResponseHighlight[]>([]);
@@ -46,14 +47,19 @@ export function useHighlights({ editorRef }: { editorRef: RefObject<TextEditorHa
 
     // Save the highlights locally if they change
     useEffect(() => {
-        if (activeFileId && !isInitialHighlightLoad.current) {
-            invoke("save_highlights", { fileId: activeFileId, highlights });
-            const highlight = highlights.find((x) => x.id === activeHighlightId);
+        async function saveHighlighs() {
+            if (activeFileId && !isInitialHighlightLoad.current) {
+                await invoke("save_highlights", { fileId: activeFileId, highlights });
+                await updateNoteTimestamp(activeFileId);
+                const highlight = highlights.find((x) => x.id === activeHighlightId);
 
-            if (highlights.length === 0 || !highlight) {
-                setActiveHighlightId(null);
+                if (highlights.length === 0 || !highlight) {
+                    setActiveHighlightId(null);
+                }
             }
         }
+
+        saveHighlighs();
     }, [highlights]);
 
     // Change active highlight if the active highlight id changes

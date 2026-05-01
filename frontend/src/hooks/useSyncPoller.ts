@@ -5,7 +5,7 @@ import { useSyncStatus } from "../contexts/SyncContext";
 const POLL_INTERVAL_MS = 120000; // 2 minutes
 
 export function useSyncPoller() {
-    const { syncEnabled, setStatus, fetchUpdates } = useSyncStatus();
+    const { syncEnabled, fetchUpdates } = useSyncStatus();
 
     useEffect(() => {
         if (!syncEnabled) return;
@@ -15,5 +15,5 @@ export function useSyncPoller() {
 
         // Cleanup interval on unmount
         return () => clearInterval(interval);
-    }, [setStatus, fetchUpdates]);
+    }, [syncEnabled, fetchUpdates]);
 }

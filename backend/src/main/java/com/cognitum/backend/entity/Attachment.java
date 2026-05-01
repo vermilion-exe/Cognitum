@@ -35,7 +35,6 @@ public class Attachment {
     @Column(name = "last_updated")
     private OffsetDateTime lastUpdated;
 
-    @Lob
     @Column(columnDefinition = "bytea")
     private byte[] bytes;
 

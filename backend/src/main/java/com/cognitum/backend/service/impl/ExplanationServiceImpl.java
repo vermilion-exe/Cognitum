@@ -16,11 +16,13 @@ import com.cognitum.backend.repository.ExplanationRepository;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.service.ExplanationService;
 import com.cognitum.backend.service.JwtService;
+import com.cognitum.backend.service.NoteService;
 import com.cognitum.backend.web.NvidiaWebClient;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,6 +36,7 @@ public class ExplanationServiceImpl implements ExplanationService {
     private final NvidiaProperties nvidiaProperties;
     private final NoteRepository noteRepository;
     private final ExplanationRepository explanationRepository;
+    private final NoteService noteService;
     private final JwtService jwtService;
 
     @Override
@@ -70,6 +73,8 @@ public class ExplanationServiceImpl implements ExplanationService {
         explanation.setNote(note);
 
         Explanation savedExplanation = explanationRepository.save(explanation);
+
+        noteService.updateNoteTimestamp(note);
 
         RequestHighlight requestHighlight = new RequestHighlight();
         requestHighlight.setId(savedExplanation.getId());
@@ -136,7 +141,11 @@ public class ExplanationServiceImpl implements ExplanationService {
             throw new UnauthorizedException("Unauthorized to delete explanation with id: " + id);
         }
 
+        Note note = explanation.getNote();
+
         explanationRepository.delete(explanation);
+
+        noteService.updateNoteTimestamp(note);
 
         return new ResponseOperation(true);
     }
@@ -152,6 +161,7 @@ public class ExplanationServiceImpl implements ExplanationService {
         }
 
         explanationRepository.deleteAllByNoteId(noteId);
+        noteService.updateNoteTimestamp(note);
         return new ResponseOperation(true);
     }
 
@@ -179,6 +189,7 @@ public class ExplanationServiceImpl implements ExplanationService {
         }
 
         explanationRepository.deleteAllExcept(ids);
+        noteService.updateNoteTimestamp(note);
         return new ResponseOperation(true);
     }
 

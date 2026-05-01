@@ -12,6 +12,7 @@ import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.FlashcardRepository;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.service.JwtService;
+import com.cognitum.backend.service.NoteService;
 import com.cognitum.backend.service.QuestionService;
 import com.cognitum.backend.web.NvidiaWebClient;
 import jakarta.transaction.Transactional;
@@ -33,6 +34,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final NvidiaWebClient webClient;
     private final NvidiaProperties nvidiaProperties;
     private final NoteRepository noteRepository;
+    private final NoteService noteService;
     private final FlashcardRepository flashcardRepository;
     private final JwtService jwtService;
 
@@ -125,13 +127,7 @@ public class QuestionServiceImpl implements QuestionService {
         String content = response.getChoices().get(0).getMessage().getContent();
 
         ObjectMapper objectMapper = new ObjectMapper();
-        List<UUID> staleIds = objectMapper.readValue(content, new TypeReference<List<UUID>>() {});
-
-        if (!staleIds.isEmpty()) {
-            flashcardRepository.markStaleByIds(staleIds);
-        }
-
-        return staleIds;
+        return objectMapper.readValue(content, new TypeReference<List<UUID>>() {});
     }
 
     @Override
@@ -185,6 +181,8 @@ public class QuestionServiceImpl implements QuestionService {
             flashcardRepository.save(flashcard);
         }
 
+        noteService.updateNoteTimestamp(note);
+
         return new ResponseOperation(true);
     }
 
@@ -222,7 +220,11 @@ public class QuestionServiceImpl implements QuestionService {
 
             Flashcard flashcard = getFlashcard(user, fc);
 
+            Note note = flashcard.getNote();
+
             flashcardRepository.save(flashcard);
+
+            noteService.updateNoteTimestamp(note);
         });
 
         return new ResponseOperation(true);
@@ -267,7 +269,11 @@ public class QuestionServiceImpl implements QuestionService {
         flashcard.setNextReview(review.getNextReview());
         flashcard.setLastReviewed(OffsetDateTime.now());
 
+        Note note = flashcard.getNote();
+
         flashcardRepository.save(flashcard);
+
+        noteService.updateNoteTimestamp(note);
 
         return new ResponseOperation(true);
     }
@@ -311,6 +317,8 @@ public class QuestionServiceImpl implements QuestionService {
                 .toList();
         flashcardRepository.deleteAll(staleFlashcards);
 
+        noteService.updateNoteTimestamp(note);
+
         return new ResponseOperation(true);
     }
 
@@ -324,6 +332,8 @@ public class QuestionServiceImpl implements QuestionService {
             throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
         flashcardRepository.deleteAllByNoteId(noteId);
+
+        noteService.updateNoteTimestamp(note);
 
         return new ResponseOperation(true);
     }
@@ -354,6 +364,8 @@ public class QuestionServiceImpl implements QuestionService {
 
         flashcardRepository.deleteAllExcept(flashcardIds);
 
+        noteService.updateNoteTimestamp(note);
+
         return new ResponseOperation(true);
     }
 
@@ -366,7 +378,11 @@ public class QuestionServiceImpl implements QuestionService {
         if (!flashcard.getNote().getUserId().equals(user.getId())) {
             throw new UnauthorizedException("Unauthorized access to flashcard with id: " + flashcardId);
         }
+        Note note = flashcard.getNote();
+
         flashcardRepository.delete(flashcard);
+
+        noteService.updateNoteTimestamp(note);
 
         return new ResponseOperation(true);
     }
