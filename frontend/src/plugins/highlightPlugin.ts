@@ -127,7 +127,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                             anchor,
                             () => {
                                 const span = document.createElement("span");
-                                span.className = "absolute animate-spin inline-block -top-1";
+                                span.className = "relative animate-spin inline-block -top-1 ml-1";
                                 span.textContent = "⏳";
                                 return span;
                             },

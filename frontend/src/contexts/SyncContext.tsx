@@ -214,7 +214,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 );
                 const fullPath = await getFullPath(note.path);
 
+                console.log("Getting timestamp");
                 const localTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: fullPath });
+                console.log("Could get timestamp");
                 const localLastUpdated = localTimestamp ? new Date(localTimestamp) : (matchedNode?.node.lastModified ? new Date(matchedNode?.node.lastModified) : null);
 
                 // If the local note is newer
@@ -399,7 +401,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 else if ((matchedImage && (new Date(matchedImage.image.lastModified!) < new Date(image.last_updated))) || !matchedImage) {
                     const fullPath = matchedImage ? matchedImage.image.id : await getFullPath(image.path);
                     if (matchedImage) await invoke("delete_file", { path: fullPath });
-                    await invoke("create_image", { path: fullPath, contents: image.bytes });
+                    await invoke("create_image", { path: fullPath, contents: Array.from(image.bytes) });
                 }
             }));
 
