@@ -21,6 +21,7 @@
         <li><a href="#run-the-ai-summarizer-service">Run The AI Summarizer Service</a></li>
         <li><a href="#run-the-spring-boot-backend">Run The Spring Boot Backend</a></li>
         <li><a href="#run-the-tauri-application">Run The Tauri Application</a></li>
+        <li><a href="#build-the-tauri-application">Build The Tauri Application</a></li>
         <li><a href="#train-the-summary-model">Train The Summary Model</a></li>
         <li><a href="#use-the-summary-inference-script">Use The Summary Inference Script</a></li>
       </ul>
@@ -241,6 +242,26 @@ From the `frontend` directory, start the desktop application:
 
 ```bash
 npm run tauri dev
+```
+
+### Build The Tauri Application
+
+From the `frontend` directory, build the desktop application:
+
+```bash
+npm run tauri build
+```
+
+On Windows, the executable is created under:
+
+```text
+frontend/src-tauri/target/release/
+```
+
+Installer bundles are created under:
+
+```text
+frontend/src-tauri/target/release/bundle/
 ```
 
 ### Train The Summary Model
