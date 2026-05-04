@@ -144,7 +144,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                     if (syncEnabled) {
                         const text = await invoke<string>("read_file", { path: node.id });
 
-                        scheduleSync(`create-note-${id}`, {
+                        scheduleSync(`create-note-${relativePath}`, {
                             type: "note",
                             operation: "create",
                             id: String(id),
@@ -193,7 +193,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
 
                     if (syncEnabled) {
                         try {
-                            const note = await invoke<RequestNote>("get_note_by_path", { path: node.id });
+                            const note = await invoke<RequestNote>("get_note_by_path", { path: relativePath });
                             const queue = await invoke<Record<string, CardReview>>("load_review_queue");
                             const filtered = Object.fromEntries(
                                 Object.entries(queue).filter(([, review]) => review.flashcard.note_id !== note.id)
@@ -242,7 +242,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
 
                 const id = note?.id ?? crypto.randomUUID();
 
-                scheduleSync(`create-note-${id}`, {
+                scheduleSync(`create-note-${relativePath}`, {
                     type: "note",
                     operation: "create",
                     id: String(id),
@@ -321,7 +321,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                 const relativePath = await toRelativePath(newPath);
                 const id = crypto.randomUUID();
 
-                scheduleSync(`create-note-${id}`, {
+                scheduleSync(`create-note-${relativePath}`, {
                     type: "note",
                     operation: "create",
                     id: String(id),
@@ -372,7 +372,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                     });
 
                     try {
-                        const note = await invoke<RequestNote>("get_note_by_path", { path: node.id });
+                        const note = await invoke<RequestNote>("get_note_by_path", { path: relativePath });
                         const queue = await invoke<Record<string, CardReview>>("load_review_queue");
                         const filtered = Object.fromEntries(
                             Object.entries(queue).filter(([, review]) => review.flashcard.note_id !== note.id)
