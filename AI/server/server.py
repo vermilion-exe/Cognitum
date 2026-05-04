@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LitServe API server for the summarizer model."""
+
 import argparse
 
 import litserve as ls
@@ -14,7 +14,7 @@ from lib.math_protection import (
 from lib.structure import add_structure_markers, split_by_headings
 from lib.generation import hierarchical_summarize
 
-# Default generation parameters (override via request body)
+# Default generation parameters
 DEFAULTS = {
     "max_input_len": 4096,
     "overlap_ratio": 0.15,

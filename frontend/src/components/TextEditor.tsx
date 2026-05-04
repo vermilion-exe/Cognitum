@@ -8,6 +8,8 @@ import { $prose, getMarkdown, replaceAll } from "@milkdown/kit/utils";
 import "katex/dist/katex.min.css";
 import { useActiveFile } from "../contexts/ActiveFileContext";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { basename } from "@tauri-apps/api/path";
 import { selectionTooltipPlugin } from "../plugins/selectionTooltipPlugin";
 import { ResponseHighlight } from "../types/ResponseHighlight";
 import { editorViewCtx } from "@milkdown/core";
@@ -15,11 +17,34 @@ import { createHighlightPlugin, setFullReplaceMeta, setHighlightsMeta, setLoadin
 import { useSyncManager } from "../hooks/useSyncManager";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { RequestNote } from "../types/RequestNote";
-import { findNodeShallow, toRelativePath } from "../utils/fsUtils";
+import { collectAllNodes, isImageNode, toRelativePath } from "../utils/fsUtils";
 import { useFileTree } from "../contexts/FileTreeContext";
-import { join } from "@tauri-apps/api/path";
 
 const AUTOSAVE_DELAY_MS = 300;
+const IMAGE_EXTENSIONS = ["apng", "png", "avif", "gif", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "svg", "webp"];
+
+type FileWithPath = File & { path?: string };
+
+const normalizePath = (path: string) => path.replace(/\\/g, "/").toLowerCase();
+
+const isPathInsideDir = (path: string, dir: string) => {
+    const normalizedPath = normalizePath(path);
+    const normalizedDir = normalizePath(dir).replace(/\/+$/, "");
+
+    return normalizedPath === normalizedDir || normalizedPath.startsWith(`${normalizedDir}/`);
+};
+
+const getOriginalFilePath = (file: File) => {
+    const path = (file as FileWithPath).path;
+    if (!path || path.includes("fakepath")) return undefined;
+
+    return path;
+};
+
+const setNativeInputValue = (input: HTMLInputElement, value: string) => {
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    valueSetter?.call(input, value);
+};
 
 export interface TextEditorHandle {
     pushHighlights: (highlights: ResponseHighlight[]) => void;
@@ -53,6 +78,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
         const currentNoteRef = useRef(currentNote);
         const isNoteLoadingRef = useRef(false);
         const isCreatingNoteRef = useRef(false);
+        const isOpeningImageDialogRef = useRef(false);
 
         const cbRef = useRef({ onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick });
         useEffect(() => { cbRef.current = { onMarkdownChange, onExplainText, onFileLoad, onHighlightsChange, onHighlightClick } });
@@ -129,6 +155,81 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             }
         }, [cancelAutosave]);
 
+        const scheduleAttachmentSync = useCallback((path: string, relativePath: string) => {
+            if (!syncEnabledRef.current) return;
+
+            const id = crypto.randomUUID();
+            scheduleSync(`attachment-${id}`, {
+                type: "attachment", operation: "create", id: String(id), payload: { file_path: path, relative_path: relativePath }
+            });
+        }, [scheduleSync]);
+
+        const resolveImagePath = useCallback(async (path: string) => {
+            const rootId = rootRef.current?.id;
+
+            if (rootId && isPathInsideDir(path, rootId)) {
+                return path;
+            }
+
+            const bytes = await invoke<number[]>("read_image", { path });
+            const fileName = await basename(path);
+            const uploadedPath = await invoke<string>("upload_image", { fileName, bytes });
+
+            const relativePath = await toRelativePath(uploadedPath);
+
+            scheduleAttachmentSync(uploadedPath, relativePath!);
+            return uploadedPath;
+        }, [scheduleAttachmentSync]);
+
+        const setImageBlockSrc = useCallback((imageBlock: HTMLElement, url: string) => {
+            const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
+            if (!view || view.isDestroyed) return false;
+
+            const pos = view.posAtDOM(imageBlock, 0);
+            const nodePos = [pos, pos - 1].find((candidate) =>
+                candidate >= 0 && view.state.doc.nodeAt(candidate)?.type.name === "image-block"
+            );
+            if (nodePos === undefined) return false;
+
+            view.dispatch(view.state.tr.setNodeAttribute(nodePos, "src", url));
+            return true;
+        }, []);
+
+        const setImageBlockInputSrc = useCallback((imageBlock: HTMLElement, url: string) => {
+            const input = imageBlock.querySelector<HTMLInputElement>(".link-input-area");
+            if (!input) return false;
+
+            input.focus();
+            setNativeInputValue(input, url);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+            return true;
+        }, []);
+
+        const handleImageDialogUpload = useCallback(async (imageBlock: HTMLElement) => {
+            if (isOpeningImageDialogRef.current) return;
+
+            isOpeningImageDialogRef.current = true;
+            try {
+                const selected = await open({
+                    multiple: false,
+                    filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
+                });
+
+                if (!selected || Array.isArray(selected)) return;
+
+                const path = await resolveImagePath(selected);
+                const url = convertFileSrc(path);
+                if (!setImageBlockSrc(imageBlock, url)) {
+                    setImageBlockInputSrc(imageBlock, url);
+                }
+            } catch (error) {
+                console.error("Image selection failed: ", error);
+            } finally {
+                isOpeningImageDialogRef.current = false;
+            }
+        }, [resolveImagePath, setImageBlockInputSrc, setImageBlockSrc]);
+
         useEffect(() => {
             if (!hostRef.current) return;
 
@@ -139,21 +240,23 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                     [Crepe.Feature.ImageBlock]: {
                         onUpload: async (file: File) => {
                             const buffer = await file.arrayBuffer();
-                            const node_path = await join(rootRef.current?.id!, file.name);
-                            const node = findNodeShallow(rootRef.current, node_path);
+                            const originalPath = getOriginalFilePath(file);
+                            const node = originalPath ? collectAllNodes(rootRef.current?.children ?? [])
+                                .find((node) =>
+                                    node.kind === "file" &&
+                                    isImageNode(node) &&
+                                    normalizePath(node.id) === normalizePath(originalPath)
+                                ) : undefined;
                             if (node) {
-                                return convertFileSrc(node_path);
+                                return convertFileSrc(node.id);
                             }
                             const path = await invoke<string>("upload_image", { fileName: file.name, bytes: Array.from(new Uint8Array(buffer)) });
 
                             const url = convertFileSrc(path);
 
-                            if (syncEnabledRef.current) {
-                                const id = crypto.randomUUID();
-                                scheduleSync(`attachment-${id}`, {
-                                    type: "attachment", operation: "create", id: String(id), payload: path
-                                });
-                            }
+                            const relativePath = await toRelativePath(path);
+
+                            scheduleAttachmentSync(path, relativePath!);
 
                             return url;
                         }
@@ -221,12 +324,29 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
             crepeRef.current = crepe;
 
+            const onImageUploadClick = (event: MouseEvent) => {
+                const target = event.target;
+                if (!(target instanceof Element)) return;
+
+                const uploader = target.closest(".milkdown-image-block .uploader");
+                const imageBlock = target.closest(".milkdown-image-block");
+                if (!(uploader instanceof HTMLElement) || !(imageBlock instanceof HTMLElement)) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+                handleImageDialogUpload(imageBlock);
+            };
+
+            const host = hostRef.current;
+            host.addEventListener("click", onImageUploadClick, true);
+
             return () => {
                 cancelAutosave();
+                host.removeEventListener("click", onImageUploadClick, true);
                 crepe.destroy();
                 crepeRef.current = null;
             };
-        }, [cancelAutosave]);
+        }, [cancelAutosave, handleImageDialogUpload, scheduleAttachmentSync]);
 
         useEffect(() => {
             if (!activeFileId) {

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""CLI inference — summarize a file from the command line."""
 
 import argparse
 

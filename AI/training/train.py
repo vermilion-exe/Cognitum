@@ -1,45 +1,15 @@
 #!/usr/bin/env python3
-"""
-train_summarizer_lightning_simple.py
-
-What this implements / changes vs a typical "simple LED trainer":
-1) FIX: Dynamic padding (no padding="max_length") to avoid wasting compute.
-2) FIX: Protect LaTeX/math by replacing math spans with placeholders <MATH_0000>...
-3) ADD: Structure markers (<H>, <BULLET>) so the model learns note structure.
-4) IMPROVE: Better global attention mask:
-   - token 0 always global
-   - headings (<H>) global
-   - bullets (<BULLET>) global
-   - math placeholders (<MATH_####>) global
-5) SAFETY: Cache key includes model+lengths to prevent stale processed dataset reuse.
-
-Expected JSONL dataset format (train/val):
-Each line: {"note": "...", "summary": "..."}.
-
-Usage example:
-python train_summarizer_lightning_simple.py \
-  --train_file data/train.jsonl \
-  --val_file data/val.jsonl \
-  --output_dir out_led \
-  --model_name allenai/led-base-16384 \
-  --max_input_len 4096 \
-  --max_target_len 512 \
-  --batch_size 1 \
-  --grad_accum 8 \
-  --pad_to_multiple_of 8
-"""
 
 import argparse
 import os
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any
 import math
 
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-from collections import Counter
 
 from datasets import load_dataset
 
@@ -50,26 +20,22 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-# ----------------------------
 # LaTeX/math protection
-# ----------------------------
 
-# NOTE: Ordered patterns matter; we prefer longer blocks first.
+# Ordered patterns matter; we prefer longer blocks first.
 MATH_PATTERNS = [
-    r"\$\$.*?\$\$",                 # $$ ... $$
-    r"\\\[.*?\\\]",                 # \[ ... \]
-    r"\\\(.*?\\\)",                 # \( ... \)
-    r"\\begin\{.*?\}.*?\\end\{.*?\}",# \begin{...} ... \end{...}
-    r"\$.*?\$",                      # $ ... $
+    r"\$\$.*?\$\$", # $$ ... $$
+    r"\\\[.*?\\\]",  # \[ ... \]
+    r"\\\(.*?\\\)",  # \( ... \)
+    r"\\begin\{.*?\}.*?\\end\{.*?\}", # \begin{...} ... \end{...}
+    r"\$.*?\$", # $ ... $
 ]
 
 _MATH_RE = re.compile("|".join(f"({p})" for p in MATH_PATTERNS), flags=re.DOTALL)
 
 def protect_math_spans(text: str, max_placeholders: int) -> Tuple[str, List[str]]:
-    """
-    Replace math spans with placeholder tokens <MATH_0000>, <MATH_0001>, ...
-    Returns (protected_text, spans_list).
-    """
+    # Replace math spans with placeholder tokens and return (protected_text, spans_list).
+
     spans: List[str] = []
 
     def _repl(m: re.Match) -> str:
@@ -83,9 +49,8 @@ def protect_math_spans(text: str, max_placeholders: int) -> Tuple[str, List[str]
     return protected, spans
 
 def add_structure_markers(text: str) -> str:
-    """
-    Add explicit marker tokens for headings and bullet lines (markdown-ish).
-    """
+    # Add explicit marker tokens for headings and bullet lines.
+
     out_lines = []
     for ln in text.splitlines():
         stripped = ln.lstrip()
@@ -108,15 +73,12 @@ def extractive_overlap(note: str, summ: str, n: int = 4) -> float:
         return 0.0
     return len(a & b) / len(b)
 
-# ----------------------------
 # Collator with LED global attention
-# ----------------------------
 
 @dataclass
 class LEDSeq2SeqCollator:
-    """
-    Wrap DataCollatorForSeq2Seq, then add global_attention_mask for LED-style models.
-    """
+    # Wrap DataCollatorForSeq2Seq, then add global_attention_mask for LED-style models.
+
     tokenizer: Any
     base_collator: DataCollatorForSeq2Seq
     global_token_ids: List[int]
@@ -137,9 +99,7 @@ class LEDSeq2SeqCollator:
         batch["global_attention_mask"] = global_attention_mask
         return batch
 
-# ----------------------------
 # Lightning Module
-# ----------------------------
 
 class LEDLightningModule(pl.LightningModule):
     def __init__(
@@ -156,7 +116,7 @@ class LEDLightningModule(pl.LightningModule):
         self.tokenizer = tokenizer
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-        # IMPORTANT: resize embeddings because we add special tokens
+        # Resize embeddings because we add special tokens
         self.model.resize_token_embeddings(len(self.tokenizer))
 
         self.lr = lr
@@ -207,9 +167,7 @@ class LEDLightningModule(pl.LightningModule):
             "lr_scheduler": {"scheduler": sched, "interval": "step"},
         }
 
-# ----------------------------
 # Main
-# ----------------------------
 
 def build_cache_key(model_name: str, max_in: int, max_out: int, num_math: int) -> str:
     safe_model = model_name.replace("/", "_")
@@ -268,7 +226,7 @@ def main():
     ds["train"] = ds["train"].filter(keep_example)
     ds["validation"] = ds["validation"].filter(keep_example)
 
-    # Preprocess with NO padding here (dynamic padding in collator)
+    # Preprocess with no padding here (dynamic padding in collator)
     def preprocess(ex: Dict[str, Any]) -> Dict[str, Any]:
         note = ex["note"]
         summ = ex["summary"]
@@ -282,7 +240,7 @@ def main():
             note_structured,
             truncation=True,
             max_length=args.max_input_len,
-            padding=False,  # IMPORTANT: dynamic padding later
+            padding=False,
         )
 
         labels = tokenizer(
@@ -326,7 +284,7 @@ def main():
 
     base_collator = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
-        model=module.model,  # <-- fixed
+        model=module.model,
         padding="longest",
         label_pad_token_id=-100,
         pad_to_multiple_of=(args.pad_to_multiple_of or None),
@@ -371,7 +329,7 @@ def main():
 
     trainer.fit(module, train_loader, val_loader)
 
-    # Save final model (Lightning saves checkpoints; also export HuggingFace model)
+    # Save final model
     final_dir = os.path.join(args.output_dir, "final_model")
     os.makedirs(final_dir, exist_ok=True)
     module.model.save_pretrained(final_dir)

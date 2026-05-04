@@ -56,7 +56,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device).eval()
 
-    # Load test data (assuming JSON with "note" and "summary" keys)
+    # Load test data
     import json
 
     with open(args.test_data, "r", encoding="utf-8") as f:

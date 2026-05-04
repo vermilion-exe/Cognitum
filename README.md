@@ -45,18 +45,6 @@ Cognitum is an AI-integrated intelligent note-taking application designed to enh
 
 The application bridges the gap between note-taking and information recall by transforming basic note-taking into a more structured learning workflow. It provides three main AI features: summarisation for quick comprehension, context-aware explanations for understanding complex topics, and a spaced-repetition system that uses AI-generated flashcards to support long-term knowledge retention.
 
-## Screenshots
-
-Screenshots will be added later.
-
-<!--
-Suggested placeholders:
-
-![Editor view](docs/screenshots/editor.png)
-![AI summary flow](docs/screenshots/summary.png)
-![Flashcard review](docs/screenshots/flashcards.png)
--->
-
 ## Built With
 
 * [![Tauri][Tauri.app]][Tauri-url]
