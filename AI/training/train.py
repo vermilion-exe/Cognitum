@@ -219,11 +219,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--train_file", required=True, help="Path to train.jsonl")
     ap.add_argument("--val_file", required=True, help="Path to val.jsonl")
-    ap.add_argument("--output_dir", required=True)
+    ap.add_argument("--output_dir", default="./models")
 
     ap.add_argument("--model_name", default="allenai/led-base-16384")
     ap.add_argument("--max_input_len", type=int, default=4096)
-    ap.add_argument("--max_target_len", type=int, default=512)
+    ap.add_argument("--max_target_len", type=int, default=1024)
 
     ap.add_argument("--batch_size", type=int, default=1)
     ap.add_argument("--grad_accum", type=int, default=8)

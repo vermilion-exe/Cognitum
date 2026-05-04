@@ -18,7 +18,7 @@ from lib.generation import hierarchical_summarize
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model_dir", required=True)
+    ap.add_argument("--model_dir", default="./models/final_model")
     ap.add_argument("--input_file", required=True)
     ap.add_argument("--max_input_len", type=int, default=4096)
     ap.add_argument("--overlap_ratio", type=float, default=0.15)

@@ -44,6 +44,7 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("application.security.jwt.secret-key", () -> dotenv.get("TEST_JWT_SECRET_KEY"));
         registry.add("nvidia.api.key", () -> dotenv.get("NVIDIA_API_KEY"));
     }
 

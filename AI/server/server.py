@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """LitServe API server for the summarizer model."""
+import argparse
 
 import litserve as ls
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -27,12 +28,18 @@ DEFAULTS = {
     "encoder_repetition_penalty": 1.05,
 }
 
-MODEL_DIR = "C:\\Users\\Farhad\\Documents\\GitHub\\Cognitum\\AI\\models\\summ-allenai-led-base-16384\\final_model"
+MODEL_DIR = "./models/final_model"
 
 class SummarizerAPI(ls.LitAPI):
+    def __init__(self, model_dir: str):
+        super().__init__()
+        self.model = None
+        self.tokenizer = None
+        self.model_dir = model_dir
+
     def setup(self, device):
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_DIR)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_dir)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_dir)
         self.model.to(device).eval()
         self.device = device
 
@@ -108,10 +115,24 @@ class SummarizerAPI(ls.LitAPI):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model_dir",
+        default="./models/final_model",
+        help="Path to the trained model directory.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to run the API server on.",
+    )
+    args = parser.parse_args()
+
     server = ls.LitServer(
-        SummarizerAPI(),
+        SummarizerAPI(model_dir=args.model_dir),
         accelerator="auto",
         devices="auto",
         timeout=120
     )
-    server.run(port=8000)
+    server.run(port=args.port)
