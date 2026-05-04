@@ -278,20 +278,18 @@ pub async fn remove_local_flashcards(
     fs::remove_file(&flashcards_path).map_err(|e| e.to_string())
 }
 
-async fn remove_local_flashcards_internal(state: &AppState, file_id: String) -> Result<(), String> {
-    let _lock = &state.flashcard_mapping_lock.lock().await;
-    let flashcards_path = &state
-        .app_handle
+fn remove_local_flashcards_internal(app: &AppHandle, filename: String) -> Result<(), String> {
+    let flashcards_path = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join(get_flashcard_mapping(&state.app_handle, &file_id, _lock)?);
+        .join(filename);
 
     if !flashcards_path.exists() {
         return Ok(());
     }
 
-    fs::remove_file(&flashcards_path).map_err(|e| e.to_string())
+    fs::remove_file(flashcards_path).map_err(|e| e.to_string())
 }
 
 fn get_flashcard_mapping<T>(
@@ -377,6 +375,7 @@ pub async fn load_review_queue(
 
 #[tauri::command]
 pub async fn delete_local_flashcards(state: State<'_, AppState>) -> Result<(), String> {
+    let _lock = &state.flashcard_mapping_lock.lock().await;
     let mappings_path = state
         .app_handle
         .path()
@@ -392,7 +391,7 @@ pub async fn delete_local_flashcards(state: State<'_, AppState>) -> Result<(), S
     };
 
     for (_, filename) in mappings {
-        let _ = remove_local_flashcards_internal(&state, filename).await?;
+        remove_local_flashcards_internal(&state.app_handle, filename)?;
     }
 
     fs::remove_file(&mappings_path).map_err(|e| e.to_string())
