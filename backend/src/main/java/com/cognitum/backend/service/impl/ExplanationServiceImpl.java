@@ -41,6 +41,7 @@ public class ExplanationServiceImpl implements ExplanationService {
 
     @Override
     public ResponseCompletion requestExplanation(String text) {
+        // Ask the AI model for a short tutoring-style explanation
         RequestCompletion request = new RequestCompletion();
         request.setModel(nvidiaProperties.getModel());
         request.setMessages(List.of(
@@ -58,10 +59,12 @@ public class ExplanationServiceImpl implements ExplanationService {
         ResponseUser user = jwtService.getTokenInfo(token);
         Note note = noteRepository.findById(request.getNoteId())
                 .orElseThrow(() -> new RuntimeException("Note not found with id: " + request.getNoteId()));
+        // Only the note owner can create or replace explanations
         if(!note.getUserId().equals(user.getId())) {
             throw new UnauthorizedException("Unauthorized to update explanation with id: " + request.getId());
         }
 
+        // Persist the highlighted range and generated explanation
         Explanation explanation = new Explanation();
 
         explanation.setId(request.getId());
@@ -76,6 +79,7 @@ public class ExplanationServiceImpl implements ExplanationService {
 
         noteService.updateNoteTimestamp(note);
 
+        // Return the saved entity in the same shape the client sent
         RequestHighlight requestHighlight = new RequestHighlight();
         requestHighlight.setId(savedExplanation.getId());
         requestHighlight.setSelectedText(savedExplanation.getSelectedText());
@@ -93,6 +97,7 @@ public class ExplanationServiceImpl implements ExplanationService {
         Explanation explanation = explanationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Explanation not found with id: " + id));
 
+        // Guard explanations through their parent note ownership
         ResponseUser user = jwtService.getTokenInfo(token);
         if(!explanation.getNote().getUserId().equals(user.getId()) ) {
             throw new UnauthorizedException("Unauthorized to access explanation with id: " + id);
@@ -114,6 +119,7 @@ public class ExplanationServiceImpl implements ExplanationService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
 
+        // The note owner gets all explanation ranges for the note
         ResponseUser user = jwtService.getTokenInfo(token);
         if(!note.getUserId().equals(user.getId()) ) {
             throw new UnauthorizedException("Unauthorized to access explanations for note with id: " + noteId);
@@ -143,6 +149,7 @@ public class ExplanationServiceImpl implements ExplanationService {
 
         Note note = explanation.getNote();
 
+        // Touch the note so sync sees explanation changes
         explanationRepository.delete(explanation);
 
         noteService.updateNoteTimestamp(note);
@@ -168,6 +175,7 @@ public class ExplanationServiceImpl implements ExplanationService {
     @Transactional
     @Override
     public ResponseOperation deleteExplanationsExcept(String token, List<UUID> ids) {
+        // Used by sync to keep only the explanations still present locally
         List<Explanation> explanations = explanationRepository.findAllById(ids);
 
         if (explanations.size() != ids.size()) {
@@ -179,6 +187,7 @@ public class ExplanationServiceImpl implements ExplanationService {
                 .map(Note::getId)
                 .collect(Collectors.toSet());
 
+        // Keep this bulk operation scoped to one note
         if (noteIds.size() != 1)
             throw new BadRequestException("The explanations don't belong to the same note");
 

@@ -12,11 +12,13 @@ export function useVaultLoader({ setRoot, redirectIfNoVault }: { setRoot: (root:
         (async () => {
             const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
+            // If there is no vault, redirect to choosePath page
             if (!cfg?.vaultPath) {
                 if (redirectIfNoVault) navigate("choosePath");
                 return;
             }
 
+            // Otherwise scan directory and retrieve nodes
             const children = await invoke<FsNode[]>("scan_dir", {
                 path: cfg.vaultPath,
                 recursive: true,

@@ -22,6 +22,7 @@ export const setLoadingMeta = "highlight/setLoading";
 export const setFullReplaceMeta = "highlight/fullReplace";
 
 function findText(doc: Node, text: string): { from: number; to: number } | null {
+    // Find the first exact text match in the document
     let found: { from: number; to: number } | null = null;
     doc.descendants((node, pos) => {
         if (found || !node.isText) return !found;
@@ -32,6 +33,7 @@ function findText(doc: Node, text: string): { from: number; to: number } | null 
 }
 
 function validateAndRestore(doc: Node, highlights: ResponseHighlight[]): ResponseHighlight[] {
+    // Keep valid ranges and restore moved ones by matching their selected text
     return highlights.flatMap((h) => {
         // Check stored positions first
         if (h.to <= doc.content.size && doc.textBetween(h.from, h.to) === h.selected_text)
@@ -60,11 +62,13 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
             apply: (tr, pluginState): PluginState => {
                 let { highlights, loadingAnchor }: PluginState = pluginState;
 
+                // React can push a fresh highlight list through transaction meta
                 const nextHighlights = tr.getMeta(setHighlightsMeta);
                 if (nextHighlights !== undefined) {
                     highlights = validateAndRestore(tr.doc, nextHighlights);
                 }
 
+                // Track where to render the inline loading spinner
                 const loadingChanged = tr.getMeta(setLoadingMeta);
                 if (loadingChanged === true) {
                     loadingAnchor = tr.selection.to;
@@ -73,6 +77,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                     loadingAnchor = null;
                 }
 
+                // Re-check highlights after a complete document replacement
                 if (tr.getMeta(setFullReplaceMeta)) {
                     highlights = validateAndRestore(tr.doc, getHighlights());
                 }
@@ -108,6 +113,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
         props: {
             decorations: (state) => {
                 const { highlights, loadingAnchor } = highlightPluginKey.getState(state) ?? { highlights: [], loadingAnchor: null };
+                // Draw each valid highlight as an inline decoration
                 const decorations = highlights
                     .filter((h: ResponseHighlight) => h.from < h.to && h.to <= state.doc.content.size)
                     .map((h: ResponseHighlight) =>
@@ -117,6 +123,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                         })
                     );
 
+                // Add a widget decoration for pending explanation generation
                 if (loadingAnchor !== null) {
                     const anchor = Math.min(
                         loadingAnchor,
@@ -141,6 +148,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
 
             handleDOMEvents: {
                 mouseover: (view, e) => {
+                    // Show a small explanation preview above the hovered highlight
                     const id = (e.target as HTMLElement)
                         .closest<HTMLElement>("[data-highlight-id]")
                         ?.dataset.highlightId;
@@ -169,6 +177,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                     return false;
                 },
                 mouseout: (_view, e) => {
+                    // Hide the preview when the pointer leaves a highlight
                     if (
                         popover &&
                         (e.target as HTMLElement).closest("[data-highlight-id]")
@@ -177,6 +186,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
                     return false;
                 },
                 click: (_, e) => {
+                    // Let React open the full explanation for the clicked highlight
                     const id = (e.target as HTMLElement)
                         .closest<HTMLElement>("[data-highlight-id]")
                         ?.dataset.highlightId;
@@ -188,6 +198,7 @@ export function createHighlightPlugin(options: HighlightPluginOptions): Plugin<P
         },
 
         view: (editorView: EditorView) => {
+            // Create the hover popover once for this editor view
             popover = document.createElement("div");
             popover.className =
                 "absolute z-50 hidden max-w-xs rounded-md border border-button-primary " +

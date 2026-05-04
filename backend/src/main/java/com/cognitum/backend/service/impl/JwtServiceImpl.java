@@ -34,6 +34,7 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        // Parse once, then let the caller choose the claim to read
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
@@ -56,6 +57,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     private Map<String, Object> getStringObjectMap(User user) {
+        // Add the user fields the frontend needs after login
         Map<String,Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("username", user.getActualUsername());
@@ -64,6 +66,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
+        // Sign a token with standard timestamps and a unique id
         long currentTimeMillis = System.currentTimeMillis();
         return Jwts
                 .builder()
@@ -77,6 +80,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
+        // A token is valid for the same username until it expires
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
@@ -104,6 +108,7 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public ResponseUser getTokenInfo(String token) {
+        // Controllers pass the full Bearer header, so strip the prefix here
         Claims claims = extractAllClaims(token.substring(7));
         return ResponseUser.builder()
                 .id(UUID.fromString((String) claims.get("userId")))
@@ -113,6 +118,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     private Key getSignInKey() {
+        // Decode the configured shared secret into an HMAC signing key
         byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecretKey());
         return Keys.hmacShaKeyFor(keyBytes);
     }

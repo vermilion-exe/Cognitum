@@ -22,6 +22,7 @@ public class LogoutServiceImpl implements LogoutHandler {
 
     @Override
     public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+        // Logout only applies to Bearer token requests
         final String authHeader = request.getHeader("Authorization");
         final String token;
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -31,6 +32,7 @@ public class LogoutServiceImpl implements LogoutHandler {
         var storedToken = tokenRepository.findByToken(token)
                 .orElse(null);
 
+        // Unknown tokens cannot be revoked, so return unauthorized
         if (storedToken == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             try {
@@ -41,6 +43,7 @@ public class LogoutServiceImpl implements LogoutHandler {
             return;
         }
 
+        // Mark the access token unusable and clear the security context
         storedToken.setExpired(true);
         storedToken.setRevoked(true);
         tokenRepository.save(storedToken);

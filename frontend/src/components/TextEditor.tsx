@@ -27,6 +27,7 @@ type FileWithPath = File & { path?: string };
 
 const normalizePath = (path: string) => path.replace(/\\/g, "/").toLowerCase();
 
+// Check if a path is inside a given directory
 const isPathInsideDir = (path: string, dir: string) => {
     const normalizedPath = normalizePath(path);
     const normalizedDir = normalizePath(dir).replace(/\/+$/, "");
@@ -34,6 +35,7 @@ const isPathInsideDir = (path: string, dir: string) => {
     return normalizedPath === normalizedDir || normalizedPath.startsWith(`${normalizedDir}/`);
 };
 
+// Get the original path of a file
 const getOriginalFilePath = (file: File) => {
     const path = (file as FileWithPath).path;
     if (!path || path.includes("fakepath")) return undefined;
@@ -41,6 +43,7 @@ const getOriginalFilePath = (file: File) => {
     return path;
 };
 
+// Update Milkdown's link input
 const setNativeInputValue = (input: HTMLInputElement, value: string) => {
     const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     valueSetter?.call(input, value);
@@ -102,6 +105,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             view.dispatch(view.state.tr.setMeta(setLoadingMeta, isExplanationLoading));
         }, [isExplanationLoading]);
 
+        // Set highlight update method for highlight plugin
         useImperativeHandle(ref, () => ({
             pushHighlights: (highlights: ResponseHighlight[]) => {
                 crepeRef.current?.editor.action((ctx) => {
@@ -119,6 +123,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             }
         }, []);
 
+        // Autosave to save file content when it changes
         const scheduleAutosave = useCallback(
             (content: string) => {
                 cancelAutosave(); // timer reset
@@ -137,6 +142,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             [cancelAutosave]
         );
 
+        // Flush pending saves on file change
         const flushAutosave = useCallback(async (fileId?: string) => {
             cancelAutosave();
             const targetId = fileId;
@@ -155,6 +161,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             }
         }, [cancelAutosave]);
 
+        // Schedule synchronisation of the uploaded attachment
         const scheduleAttachmentSync = useCallback((path: string, relativePath: string) => {
             if (!syncEnabledRef.current) return;
 
@@ -164,6 +171,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             });
         }, [scheduleSync]);
 
+        // Get the image path, upload if not in vault
         const resolveImagePath = useCallback(async (path: string) => {
             const rootId = rootRef.current?.id;
 
@@ -181,6 +189,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             return uploadedPath;
         }, [scheduleAttachmentSync]);
 
+        // Update Milkdown's image block source
         const setImageBlockSrc = useCallback((imageBlock: HTMLElement, url: string) => {
             const view = crepeRef.current?.editor.action((ctx) => ctx.get(editorViewCtx));
             if (!view || view.isDestroyed) return false;
@@ -195,6 +204,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             return true;
         }, []);
 
+        // Fallback for when image block not found
         const setImageBlockInputSrc = useCallback((imageBlock: HTMLElement, url: string) => {
             const input = imageBlock.querySelector<HTMLInputElement>(".link-input-area");
             if (!input) return false;
@@ -206,6 +216,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
             return true;
         }, []);
 
+        // Open file dialog for choosing a file
         const handleImageDialogUpload = useCallback(async (imageBlock: HTMLElement) => {
             if (isOpeningImageDialogRef.current) return;
 
@@ -239,6 +250,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                 featureConfigs: {
                     [Crepe.Feature.ImageBlock]: {
                         onUpload: async (file: File) => {
+                            // Handle file upload
                             const buffer = await file.arrayBuffer();
                             const originalPath = getOriginalFilePath(file);
                             const node = originalPath ? collectAllNodes(rootRef.current?.children ?? [])
@@ -266,6 +278,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
             crepe.editor.config((ctx => {
                 ctx.get(listenerCtx).markdownUpdated(async (_ctx, markdown) => {
+                    // The config used when the markdown is updated
                     scheduleAutosave(markdown);
                     cbRef.current.onMarkdownChange?.(markdown);
                     const lastUpdated = new Date().toISOString();
@@ -273,6 +286,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
                     if (!syncEnabledRef.current) return;
 
+                    // If sync is enabled and the note does not exist yet, create one and set current note
                     console.log("The markdown changed");
                     if (!currentNoteRef.current && !isCreatingNoteRef.current && !isNoteLoadingRef.current) {
                         isCreatingNoteRef.current = true;
@@ -293,6 +307,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
                     if (isCreatingNoteRef.current || !currentNoteRef.current) return;
 
+                    // Otherwise, update the existing note in DB
                     console.log("Syncing the note changes");
                     isCreatingNoteRef.current = true;
                     scheduleSync(`create-note-${currentNoteRef.current?.id}`,
@@ -324,6 +339,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
 
             crepeRef.current = crepe;
 
+            // Override the image upload logic
             const onImageUploadClick = (event: MouseEvent) => {
                 const target = event.target;
                 if (!(target instanceof Element)) return;

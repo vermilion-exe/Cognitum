@@ -79,9 +79,11 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
         setRoot(makeRoot(root, children));
     };
 
+    // Watch the vault directory for any node changes outside the app
     useDirectoryWatcher(root?.id ?? null, async () => {
         if (!root) return;
 
+        // If the change is by the app, skip actions
         if (isAppChangeRef.current) {
             isAppChangeRef.current = false;
             return;
@@ -94,13 +96,16 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
             recursive: true,
         });
 
+        // Get the new and old nodes
         const newNodes = collectAllNodes(children);
         const oldNodes = new Map(collectAllNodes(root.children ?? []).map((node) => [node.id, node]));
         const newMap = new Map(newNodes.map((node) => [node.id, node]));
 
+        // Get created nodes
         const created = newNodes.filter((node) => {
             if (oldNodes.has(node.id)) return false;
 
+            // If file was updated from somewhere else in the app, ignore it
             const ignoreUntil = ignoredFileWritesRef.current.get(node.id);
             if (ignoreUntil && Date.now() < ignoreUntil) {
                 ignoredFileWritesRef.current.delete(node.id);
@@ -109,11 +114,16 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
 
             return true;
         });
+
+        // Get deleted nodes
         const deleted = [...oldNodes.values()].filter((node) => !newMap.has(node.id));
+
+        // Get modified nodes
         const modified = newNodes.filter((node) => {
             const oldNode = oldNodes.get(node.id);
             if (!oldNode || oldNode.lastModified === node.lastModified) return false;
 
+            // If file was updated from somewhere else in the app, ignore it
             const ignoreUntil = ignoredFileWritesRef.current.get(node.id);
             if (ignoreUntil && Date.now() < ignoreUntil) {
                 ignoredFileWritesRef.current.delete(node.id);
@@ -130,6 +140,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                 const id = crypto.randomUUID();
                 const relativePath = await toRelativePath(node.id);
 
+                // If the node is a markdown file and sync is enabled, upload it to DB
                 if (node.extension === "md") {
                     let lastUpdated = await invoke<string | null>("get_local_note_timestamp", { path: node.id });
 
@@ -159,6 +170,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                     }
                 }
 
+                // Otherwise, sync the uploaded attachments
                 if (syncEnabled && isImageNode(node)) {
                     const lastUpdated = node.lastModified
                         ? new Date(node.lastModified).toISOString()
@@ -185,6 +197,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                 const id = crypto.randomUUID();
                 const relativePath = await toRelativePath(node.id);
 
+                // Remove local markdown data and sync DB note deletion
                 if (node.extension === "md") {
                     await invoke("remove_local_highlights", { fileId: node.id }).catch(console.error);
                     await invoke("remove_local_summary", { fileId: node.id }).catch(console.error);
@@ -212,6 +225,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
                     }
                 }
 
+                // Schedule DB attachment deletion
                 if (syncEnabled && isImageNode(node)) {
                     scheduleSync(`delete-attachment-${id}`, {
                         type: "attachment",
@@ -224,6 +238,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
         }
 
         if (modified.length > 0 && syncEnabled) {
+            // Schedule the note updates for modified notes
             await Promise.all(modified.map(async (node) => {
                 if (node.kind !== "file" || node.extension !== "md") return;
 
@@ -261,6 +276,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
     });
 
     const toggleOpen = (e: React.MouseEvent, node: FsNode, isNodeCreation: boolean) => {
+        // When a node is clicked, add it to the list of open nodes
         if (node.kind === "dir") {
             setOpenIds((prev) => {
                 const next = new Set(prev);
@@ -289,6 +305,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
     };
 
     const closeFile = (id: string) => {
+        // Remove a node from the list of open nodes
         setOpenIds((prev) => {
             const next = new Set(prev);
             next.delete(id);
@@ -303,6 +320,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
     const createNode = async (targetId: string, nodeName: string, isDirectory: boolean) => {
         if (!root) return;
 
+        // Create the node locally
         isAppChangeRef.current = true;
 
         const fileName = isDirectory ? nodeName : `${nodeName}.md`;
@@ -313,6 +331,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
             ...(!isDirectory && { contents: "" }),
         });
 
+        // If the created node is a markdown file, sync it
         if (!isDirectory) {
             const now = new Date().toISOString();
             await invoke("save_note_timestamp", { path: newPath, timestamp: now });
@@ -351,6 +370,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
 
         isAppChangeRef.current = true;
 
+        // Remove local markdown data
         if (node.kind === "file" && node.extension === "md") {
             await invoke("remove_local_highlights", { fileId: nodeId }).catch(console.error);
             await invoke("remove_local_summary", { fileId: nodeId }).catch(console.error);
@@ -358,6 +378,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
             await invoke("remove_local_note_timestamp", { path: node.id }).catch(console.error);
         }
 
+        // Sync deletion of files
         if (syncEnabled) {
             if (node.kind === "file") {
                 const relativePath = await toRelativePath(nodeId);
@@ -422,6 +443,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
     const renameNode = async (nodeId: string, newName: string) => {
         if (!root) return;
 
+        // Find the node with the given path
         const node = findNode(root, nodeId);
         if (!node) return;
 
@@ -438,6 +460,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
 
         await invoke("rename", { from: node.id, to: newPath });
 
+        // Update the local markdown file entities to match the new path
         if (node.kind === "file" && node.extension === "md") {
             const lastTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: node.id });
             await invoke("remove_local_note_timestamp", { path: node.id }).catch(console.error);
@@ -465,6 +488,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
             }
         }
 
+        // If sync is enabled, push the new path to DB
         if (syncEnabled && node.kind === "file") {
             const oldRelativePath = await toRelativePath(node.id);
             const newRelativePath = await toRelativePath(newPath);

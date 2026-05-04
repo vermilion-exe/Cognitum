@@ -42,6 +42,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
     }, [flashcards]);
 
 
+    // Generate flashcards for the given markdown and count
     const createFlashcards = async () => {
         try {
             return await invoke<ResponseFlashcard[]>("generate_flashcards", { markdown: markdownRef.current!, count: 10 });
@@ -52,26 +53,31 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         }
     }
 
-    // Generate flashcards for the current note
+    // Handle flashcard loading
     useEffect(() => {
+        // If no file is open, return
         if (!activeFileId || !markdown) {
             setFlashcardsLoading(false);
             return;
         }
 
+        // If file change occured, set current flashcards to empty array
         if (prevFileIdRef.current !== activeFileIdRef.current) setFlashcards([]);
         prevFileIdRef.current = activeFileIdRef.current;
 
         if (textDebounceRef.current) clearTimeout(textDebounceRef.current);
 
+        // If initial load, no delay, otherwise 2 second delay for markdown changes
         const delay = flashcards.length === 0 && markdownRef.current.length < MIN_CHARS ? 0 : 2000;
 
         setFlashcardsLoading(true);
         textDebounceRef.current = setTimeout(async () => {
             if (flashcards.length === 0) {
+                // If no flashcards loaded, try loading local ones
                 console.log("Loading local flashcards");
                 const local_flashcards = await invoke<ResponseFlashcard[]>("load_local_flashcards", { fileId: activeFileIdRef.current! });
 
+                // If local flashcards exist, load and return
                 if (local_flashcards?.length) {
                     console.log("local flashcards found:", local_flashcards);
                     setFlashcards(local_flashcards);
@@ -79,8 +85,11 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
                     await checkForRelevance();
                     return;
                 }
+
+                // If a note does not have enough content, return
                 if (markdownRef.current.length < MIN_CHARS) { setFlashcardsLoading(false); return; };
 
+                // If there is content, generate flashcards for the note
                 console.log("Generating flashcards");
                 let generated_flashcards = await createFlashcards();
 
@@ -90,6 +99,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
                     return;
                 }
 
+                // Upload the created flashcards to DB if sync is enabled
                 if (syncEnabled && status !== "syncing") {
                     console.log("Syncing flashcards");
                     const id = crypto.randomUUID();
@@ -105,6 +115,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
                 setFlashcards(generated_flashcards);
             }
             else {
+                // If there are already flashcards, check their relevance
                 if (markdownRef.current.length < MIN_CHARS) { setFlashcardsLoading(false); return; }
                 await checkForRelevance();
             }
@@ -116,6 +127,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         }
     }, [markdown, activeFileId]);
 
+    // Check flashcards for relevance and update stale flashcards
     const checkForRelevance = async () => {
         console.log("Checking flashcards for relevance");
         const irrelevantIds = await invoke<String[]>("check_flashcard_relevance", { markdown: markdownRef?.current!, flashcards: flashcards });
@@ -136,6 +148,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         console.log("No irrelevant flashcards found", irrelevantIds);
     }
 
+    // Replace stale flashcards with new ones
     const replaceStaleFlashcards = async () => {
         if (!flashcards) return;
 
@@ -188,6 +201,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         }
     }
 
+    // Delete the given flashcard
     const deleteFlashcard = async (flashcardId: String) => {
         if (!flashcards.find((f) => f.id === flashcardId)) return;
 
@@ -211,6 +225,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         await invoke("delete_flashcard", { flashcardId: flashcardId });
     }
 
+    // Replace the given flashcard
     const replaceFlashcard = async (flashcardId: String) => {
         if (!flashcards.find((f) => f.id === flashcardId)) return;
         const fileId = activeFileIdRef.current!;
@@ -236,6 +251,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         await updateNoteTimestamp(activeFileIdRef.current);
     }
 
+    // Flush the current review queue based on an interval
     const flushPersistedQueue = useCallback(async () => {
         if (!syncEnabled) return;
         const saved = await invoke<Record<string, CardReview>>("load_review_queue");
@@ -259,6 +275,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         await invoke("save_review_queue", { queue: failed });
     }, []);
 
+    // If sync is enabled, uses the review queue to sync changes
     useEffect(() => {
         if (!syncEnabled) return;
 
@@ -266,6 +283,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
         return () => clearInterval(interval);
     }, [syncEnabled, flushPersistedQueue]);
 
+    // Review card and update its scheduling info
     const reviewCard = useCallback((key: String, review: CardReview) => {
         reviewQueue.current.set(key, review);
 

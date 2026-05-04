@@ -39,6 +39,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final JwtService jwtService;
 
     private ResponseCompletion requestQuestions(String markdown, Integer count) {
+        // Ask the AI model to return flashcards as raw JSON
         RequestCompletion request = new RequestCompletion();
         request.setModel(nvidiaProperties.getModel());
 
@@ -78,6 +79,7 @@ public class QuestionServiceImpl implements QuestionService {
     public List<UUID> checkFlashcardRelevance(String markdown, List<ResponseFlashcard> flashcards) {
         if (flashcards.isEmpty()) return List.of();
 
+        // Send the existing cards so the model can identify stale ones
         String flashcardsJson = flashcards.stream()
                 .map(fc -> String.format(
                         "{\"id\": %s, \"question\": \"%s\", \"answer\": \"%s\"}",
@@ -124,6 +126,7 @@ public class QuestionServiceImpl implements QuestionService {
         if (response.getChoices() == null)
             return List.of();
 
+        // Parse the model's JSON array of stale flashcard ids
         String content = response.getChoices().get(0).getMessage().getContent();
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -132,6 +135,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public List<ResponseFlashcard> generateFlashcards(String markdown, Integer count) {
+        // Generate new cards, then initialize review metadata locally
         ResponseCompletion response = requestQuestions(markdown, count);
         if (response.getChoices() == null)
             return List.of();
@@ -166,11 +170,13 @@ public class QuestionServiceImpl implements QuestionService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
+        // Only the note owner can mark its flashcards stale
         if (!note.getUserId().equals(user.getId())) {
             throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
 
         for (UUID fid : flashcardIds) {
+            // Each flashcard is checked before it is marked stale
             Flashcard flashcard = flashcardRepository.findById(fid)
                     .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + fid));
             if (!flashcard.getNote().getUserId().equals(user.getId())) {
@@ -188,6 +194,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public List<ResponseFlashcard> getDueCards(String token) {
+        // Fetch cards due for review today or earlier
         ResponseUser user = jwtService.getTokenInfo(token);
         List<Flashcard> dueReviews = flashcardRepository.findDueCards(user.getId(), LocalDate.now());
         return dueReviews.stream().map(flashcard -> {
@@ -212,6 +219,7 @@ public class QuestionServiceImpl implements QuestionService {
     public ResponseOperation createFlashcards(String token, List<ResponseFlashcard> request) {
         request.forEach(fc -> {
             ResponseUser user = jwtService.getTokenInfo(token);
+            // Existing cards must still belong to the current user
             Flashcard oldFlashcard = flashcardRepository.findById(fc.getId())
                     .orElse(null);
             if (oldFlashcard != null && !oldFlashcard.getNote().getUserId().equals(user.getId())) {
@@ -231,6 +239,7 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     private Flashcard getFlashcard(ResponseUser user, ResponseFlashcard request) {
+        // Convert the API shape into a Flashcard entity
         Flashcard flashcard = new Flashcard();
         flashcard.setId(request.getId());
         Note note = noteRepository.findById(request.getNoteId())
@@ -255,6 +264,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public ResponseOperation submitReview(String token, ResponseFlashcard review) {
+        // Save the spaced-repetition result for a reviewed card
         ResponseUser user = jwtService.getTokenInfo(token);
         Flashcard flashcard = flashcardRepository.findById(review.getId())
                 .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + review.getId()));
@@ -283,6 +293,7 @@ public class QuestionServiceImpl implements QuestionService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
+        // Card lists are scoped through note ownership
         if (!note.getUserId().equals(user.getId())) {
             throw new UnauthorizedException("Unauthorized access to note with id: " + noteId);
         }
@@ -306,6 +317,7 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional
     @Override
     public ResponseOperation deleteStaleFlashcards(String token, Long noteId) {
+        // Remove only cards already marked stale for this note
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
@@ -325,6 +337,7 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional
     @Override
     public ResponseOperation deleteAllFlashcardsByNoteId(String token, Long noteId) {
+        // Clear all flashcards for one owned note
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new NotFoundException("Note not found with id: " + noteId));
         ResponseUser user = jwtService.getTokenInfo(token);
@@ -341,6 +354,7 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional
     @Override
     public ResponseOperation deleteFlashcardsExcept(String token, List<UUID> flashcardIds) {
+        // Used by sync to keep only the flashcards still present locally
         List<Flashcard> flashcards = flashcardRepository.findAllById(flashcardIds);
 
         if (flashcards.size() != flashcardIds.size()) {
@@ -352,6 +366,7 @@ public class QuestionServiceImpl implements QuestionService {
                 .distinct()
                 .toList();
 
+        // Keep this bulk delete scoped to one note
         if (noteIds.size() != 1) {
             throw new BadRequestException("Provided flashcards do not belong to the same note");
         }
@@ -372,6 +387,7 @@ public class QuestionServiceImpl implements QuestionService {
     @Transactional
     @Override
     public ResponseOperation deleteFlashcard(String token, UUID flashcardId) {
+        // Delete one owned flashcard and update its parent note timestamp
         Flashcard flashcard = flashcardRepository.findById(flashcardId)
                 .orElseThrow(() -> new NotFoundException("Flashcard not found with id: " + flashcardId));
         ResponseUser user = jwtService.getTokenInfo(token);

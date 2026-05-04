@@ -69,6 +69,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const toast = useToast();
 
     async function getCurrentNote() {
+        // Load the DB note for the active file, or create one if missing
         const relativePath = await toRelativePath(activeFileId);
         setIsNoteLoading(true);
         try {
@@ -89,6 +90,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         async function loadSyncEnabled() {
             if (!user) return;
+            // Read the saved sync setting once the user is available
             console.log("loading sync enabled");
             const cfg = await invoke<{ syncEnabled?: boolean }>("load_config");
             console.log(cfg.syncEnabled);
@@ -108,6 +110,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (!syncLoaded) return;
 
         async function saveSyncEnabled() {
+            // Persist sync toggle changes after the initial load
             await invoke("save_sync_enabled", { syncEnabled: syncEnabled });
         }
 
@@ -115,6 +118,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }, [syncEnabled, syncLoaded]);
 
     useEffect(() => {
+        // Refresh the current note when the active file changes
         if (!activeFileId || !syncEnabled || status === "syncing") {
             setCurrentNote(null);
             return;
@@ -135,6 +139,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     const replayOfflineQueue = async () => {
+        // Re-schedule operations saved while the app was offline
         invoke<Record<string, SyncOperation>>("load_sync_queue")
             .then((saved) => {
                 if (!saved) return;
@@ -146,11 +151,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     useEffect(() => {
+        // Store the latest successful sync time locally
         if (!lastSyncTimestamp || lastSyncTimestamp === null) return;
         invoke("save_sync_timestamp", { timestamp: new Date(lastSyncTimestamp!).toISOString() });
     }, [lastSyncTimestamp]);
 
     const handleSync = async () => {
+        // Decide whether to resume a full sync or fetch recent changes
         const timestamp = await invoke<string | null>("load_sync_timestamp");
         const loadedTimestamp = timestamp ? new Date(timestamp).getTime() : null;
         setLastSyncTimestamp(loadedTimestamp);
@@ -179,6 +186,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const loadFullSyncData = async () => {
+        // Collect DB notes, attachments, and current vault files
         console.log("Getting notes from DB.");
         const db_notes = await invoke<RequestNote[]>("get_all_notes");
         const db_images = await invoke<ResponseAttachment[]>("get_attachments");
@@ -212,6 +220,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const getLocalLastUpdated = async (fullPath: string | undefined, matchedNode?: NodeWithRelativePath) => {
+        // Prefer saved note timestamps, falling back to file modified time
         console.log("Getting timestamp");
         const localTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: fullPath });
         console.log("Could get timestamp");
@@ -221,6 +230,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadExistingLocalSummary = async (note: RequestNote, fileId: string) => {
+        // Copy an existing local summary into the DB
         const summary = await invoke<string | null>("get_local_summary", { fileId });
         if (summary !== null) {
             let id: ResponseSummary["id"] | null = null;
@@ -235,6 +245,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadExistingLocalHighlights = async (note: RequestNote, fullPath: string | undefined, localFileId: string) => {
+        // Copy local highlights and explanations into the DB
         const highlights = await invoke<ResponseHighlight[] | null>("read_highlights", { fileId: fullPath });
         if (highlights !== null && highlights.length !== 0) {
             try {
@@ -260,6 +271,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadExistingLocalFlashcards = async (note: RequestNote, fullPath: string | undefined) => {
+        // Copy local flashcards into the DB
         const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { fileId: fullPath });
         if (flashcards !== null && flashcards.length !== 0) {
             try {
@@ -283,6 +295,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadExistingLocalNote = async (note: RequestNote, matchedNode: NodeWithRelativePath, fullPath: string | undefined, localTimestamp: string | null) => {
+        // Local version won the timestamp check, so upload it
         console.log("Local note is newer for note with path", note.path);
         const text = await getNoteText(note.path);
         await invoke("create_note", { request: { id: note.id, text: text, path: note.path, created_at: note.created_at, last_updated: localTimestamp } });
@@ -294,6 +307,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const downloadDbNote = async (note: RequestNote, fullPath: string | undefined) => {
+        // DB version won the timestamp check, so write it locally
         console.log("DB note is newer for note with path", note.path);
         if (activeFileId === fullPath)
             setActiveFileId(undefined);
@@ -319,6 +333,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const syncDbNote = async (note: RequestNote, nodes_with_paths: NodeWithRelativePath[], progress: RequestSyncProgress) => {
+        // Sync one DB note against its matching local file
         if (progress.completed_note_ids.includes(note.id!)) return;
 
         const matchedNode = nodes_with_paths.find(
@@ -339,6 +354,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const syncDbNotes = async (db_notes: RequestNote[], nodes_with_paths: NodeWithRelativePath[], progress: RequestSyncProgress) => {
+        // Process notes that already exist in the DB
         if (db_notes.length !== 0) {
             console.log("Found DB notes, syncing.");
         }
@@ -349,6 +365,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadNewLocalNoteSummary = async (noteId: bigint, fileId: string) => {
+        // Upload summary data for a newly discovered local note
         console.log("Checking summaries");
         const summary = await invoke<string | null>("get_local_summary", { fileId });
         if (summary !== null && summary !== "") {
@@ -358,6 +375,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadNewLocalNoteHighlights = async (noteId: bigint, fileId: string) => {
+        // Upload highlights for a newly discovered local note
         console.log("Checking highlights");
         const highlights = await invoke<ResponseHighlight[] | null>("read_highlights", { fileId });
         if (highlights !== null && highlights.length !== 0) {
@@ -374,6 +392,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadNewLocalNoteFlashcards = async (noteId: bigint, fileId: string) => {
+        // Upload flashcards for a newly discovered local note
         console.log("Checking flashcards");
         const flashcards = await invoke<ResponseFlashcard[] | null>("load_local_flashcards", { fileId });
         if (flashcards !== null && flashcards.length !== 0) {
@@ -388,6 +407,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const uploadNewLocalNote = async (node_with_path: NodeWithRelativePath, progress: RequestSyncProgress) => {
+        // Create a DB note for a local markdown file that is not synced yet
         console.log("Note does not exist in DB with path", node_with_path.relativePath);
         const text = await getNoteText(node_with_path.relativePath!);
 
@@ -406,6 +426,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const syncNewLocalNotes = async (nodes_with_paths: NodeWithRelativePath[], db_notes: RequestNote[], progress: RequestSyncProgress) => {
+        // Find local markdown files that do not exist in the DB yet
         if (nodes_with_paths.length !== 0) {
             console.log("Local notes found, syncing.");
         }
@@ -423,6 +444,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const collectImagesWithPaths = async (images: FsNode[]) => {
+        // Attach vault-relative paths to image nodes
         return await Promise.all(
             images.map(async (image) => ({
                 image,
@@ -432,6 +454,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const syncDbImages = async (db_images: ResponseAttachment[], images_with_paths: ImageWithRelativePath[]) => {
+        // Sync attachments that already exist in the DB
         await Promise.all(db_images.map(async (image) => {
             const matchedImage = images_with_paths.find(
                 ({ relativePath }) => relativePath === image.path
@@ -450,6 +473,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const syncNewLocalImages = async (images_with_paths: ImageWithRelativePath[], db_images: ResponseAttachment[]) => {
+        // Upload local images that do not exist in the DB yet
         await Promise.all(images_with_paths.map(async (image_with_path) => {
             const db_exists = db_images.some(image => image.path === image_with_path.relativePath);
 
@@ -461,6 +485,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const triggerFullSync = async (progress?: RequestSyncProgress) => {
+        // Run the full two-way sync for notes and images
         if (!user) return;
 
         setStatus("syncing");
@@ -486,6 +511,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     const fetchUpdates = async (timestampOverride?: number | null) => {
+        // Fetch notes changed since the last successful sync
         if (!user) return;
         const syncTimestamp = timestampOverride ?? lastSyncTimestamp;
         if (!syncTimestamp || syncTimestamp === null || syncTimestamp === 0) return;
@@ -563,10 +589,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
 
     const getNoteText = async (path: string) => {
+        // Read a note using its vault-relative path
         return await invoke("read_file", { path: await getFullPath(path) });
     }
 
     const getFullPath = async (relativePath: string) => {
+        // Convert a vault-relative path into a full filesystem path
         const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
         if (cfg.vaultPath) {

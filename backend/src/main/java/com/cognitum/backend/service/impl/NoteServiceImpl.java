@@ -25,6 +25,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public List<ResponseNote> getNotes(String token) {
+        // Return only notes owned by the authenticated user
         ResponseUser user = jwtService.getTokenInfo(token);
         List<Note> notes = noteRepository.findAllByUserId(user.getId());
 
@@ -37,12 +38,14 @@ public class NoteServiceImpl implements NoteService {
     public ResponseNote createNote(String token, RequestNote request) {
         ResponseUser user = jwtService.getTokenInfo(token);
 
+        // Use the client timestamp when sync provides one
         OffsetDateTime requestLastUpdated = request.getLastUpdated() != null
                 ? request.getLastUpdated()
                 : OffsetDateTime.now();
         Note note;
 
         if (request.getId() != null) {
+            // Updating by id must still belong to the current user
             note = noteRepository.findById(request.getId())
                     .orElseThrow(() -> new NotFoundException("Note not found"));
 
@@ -50,10 +53,12 @@ public class NoteServiceImpl implements NoteService {
                 throw new UnauthorizedException("Cannot modify another user's note");
             }
         } else {
+            // Otherwise upsert the latest note with the same path
             note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), request.getPath())
                     .orElseGet(Note::new);
         }
 
+        // Ignore stale writes so older sync data cannot overwrite newer notes
         if (note.getId() != null && note.getLastUpdated() != null && requestLastUpdated.isBefore(note.getLastUpdated())) {
             return toResponseNote(note);
         }
@@ -73,6 +78,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public void updateNoteTimestamp(Note note) {
+        // Mark related data changes as note updates for sync
         note.setLastUpdated(OffsetDateTime.now());
         noteRepository.save(note);
     }
@@ -88,6 +94,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public List<ResponseNote> getNotesSince(String token, OffsetDateTime timestamp) {
+        // Incremental sync asks for notes changed after a saved timestamp
         ResponseUser user = jwtService.getTokenInfo(token);
         List<Note> notes = noteRepository.findAllByUserIdAndLastUpdatedAfter(user.getId(), timestamp);
 
@@ -98,6 +105,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public ResponseNote moveNote(String token, String oldPath, String newPath) {
+        // Keep the server path aligned with a local file rename or move
         ResponseUser user = jwtService.getTokenInfo(token);
         Note note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), oldPath)
                 .orElseThrow(() -> new NotFoundException("Note not found"));
@@ -110,6 +118,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public ResponseOperation deleteNote(String token, String path) {
+        // Delete the user's latest note at the requested path
         ResponseUser user = jwtService.getTokenInfo(token);
         Note note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), path)
                 .orElseThrow(() -> new NotFoundException("Note not found"));

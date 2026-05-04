@@ -61,12 +61,6 @@ public class AuthenticationController {
     public ResponseEntity<Boolean> changePassword(@RequestBody RequestChangePassword changePassword) {
         return service.changePassword(changePassword);
     }
-//
-//    @PostMapping("/change-username")
-//    public ResponseEntity<Boolean> changeUsername(@RequestHeader(value = "Authorization") String token,
-//                                                  @RequestBody RequestChangeUsername changeUsername) {
-//        return service.changeUsername(token, changeUsername);
-//    }
 
     @GetMapping("/user")
     public ResponseUserInfo getUser(@RequestHeader(value = "Authorization") String token) {

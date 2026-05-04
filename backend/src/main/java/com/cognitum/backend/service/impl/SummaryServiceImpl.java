@@ -28,11 +28,13 @@ public class SummaryServiceImpl implements SummaryService {
 
     @Override
     public ResponseSummary summarize(RequestSummary requestSummary) {
+        // Forward summarization requests to the AI summary client
         return webClient.summarize(requestSummary);
     }
 
     @Override
     public ResponseSummary getSummaryByNoteId(String token, Long noteId) {
+        // Summary access is checked through the parent note
         Summary summary = summaryRepository.getSummaryByNoteId(noteId)
                 .orElseThrow(() -> new NotFoundException("Summary not found"));
         ResponseUser user = jwtService.getTokenInfo(token);
@@ -47,6 +49,7 @@ public class SummaryServiceImpl implements SummaryService {
     public ResponseSummary createSummary(String token, ResponseSummary request) {
         ResponseUser user = jwtService.getTokenInfo(token);
 
+        // Existing summaries can only be replaced by the owner
         summaryRepository.getSummaryByNoteId(request.getNoteId())
                 .ifPresent(s -> {
                     if (!s.getNote().getUserId().equals(user.getId()))
@@ -56,6 +59,7 @@ public class SummaryServiceImpl implements SummaryService {
         Note note = noteRepository.findById(request.getNoteId())
                 .orElseThrow(() -> new NotFoundException("Note not found"));
 
+        // Save the summary against the requested note
         Summary summary = new Summary();
         summary.setId(request.getId());
         summary.setSummary(request.getSummary());

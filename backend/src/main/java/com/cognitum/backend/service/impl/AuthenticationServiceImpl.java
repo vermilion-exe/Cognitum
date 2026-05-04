@@ -55,10 +55,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public ResponseEntity<ResponseAuthentication> register(RequestRegister requestRegister) {
+        // Do not allow duplicate accounts for the same email
         userRepository.findByEmail(requestRegister.getEmail()).ifPresent(user -> {
             throw new ResourceConflictException("User with email " + requestRegister.getEmail() + " already exists");
         });
 
+        // Create the user and either activate immediately or send a code
         User user = new User();
         user.setEmail(requestRegister.getEmail());
         user.setPassword(passwordEncoder.encode(requestRegister.getPassword()));
@@ -73,6 +75,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         User savedUser = userRepository.save(user);
         if(savedUser.getId() != null){
+            // Return an initial token pair after successful registration
             var jwtToken = jwtService.generateToken(savedUser);
             var refreshToken = jwtService.generateRefreshToken(savedUser);
 
@@ -95,6 +98,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         User user = userRepository.findByEmail(requestAuthentication.getEmail())
                 .orElseThrow(() -> new NotFoundException("User with email " + requestAuthentication.getEmail() + " not found"));
 
+        // Replace old access tokens when credentials are valid
         if(passwordEncoder.matches(requestAuthentication.getPassword(), user.getPassword())){
             var jwtToken = jwtService.generateToken(user);
             var refreshToken = jwtService.generateRefreshToken(user);
@@ -123,11 +127,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private void saveUserToken(User user, String jwtToken) {
+        // Store active access tokens so logout can revoke them
         Token token = Token.builder().token(jwtToken).user(user).tokenType(TokenType.BEARER).expired(false).revoked(false).build();
         tokenRepository.save(token);
     }
 
     private void revokeAllUserTokens(User user) {
+        // Mark all previous access tokens unusable
         tokenRepository.findAllByUserId(user.getId()).forEach(token -> {
             token.setExpired(true);
             token.setRevoked(true);
@@ -145,6 +151,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             return ResponseEntity.badRequest().body(new ResponseAuthentication());
         }
         refreshToken = authHeader.substring(7);
+        // Use a valid refresh token to issue a new access token
         userEmail = jwtService.extractUsername(refreshToken);
         if(userEmail != null){
             User user = userRepository.findByEmail(userEmail)
@@ -173,6 +180,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public ResponseOperation confirmUser(RequestConfirmation requestConfirmation) {
         Optional<User> user = userRepository.findByEmail(requestConfirmation.getEmail());
+        // Activate only when the submitted code matches the saved one
         if(user.isPresent() && user.get().getCode().equals(requestConfirmation.getCode())){
             user.get().setIsActive(true);
             userRepository.save(user.get());
@@ -182,6 +190,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public ResponseEntity<Boolean> emailSendCode(String email, Boolean isChangePassword) {
+        // Generate and email a fresh confirmation code
         return userRepository.findByEmail(email)
                 .map(user -> {
                     Long confirmationCode = generateRandomConfirmationCode();
@@ -205,6 +214,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         boolean isConfirmPasswordValid =validateConfirmPassword(changePassword);
         boolean isConfirmationCodeValid = validateConfirmationCode(user.get(), changePassword.getEmailConfirmCode());
 
+        // Require both the email code and repeated password to match
         if(!isConfirmationCodeValid || !isConfirmPasswordValid){
             return ResponseEntity.badRequest().body(false);
         }
@@ -239,6 +249,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     @Override
     public ResponseOperation removeUser(String token) {
+        // Remove user-owned data before deleting the account
         ResponseUser user = jwtService.getTokenInfo(token);
         removeData(user.getId());
         tokenRepository.deleteAllByUserId(user.getId());
@@ -247,6 +258,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private void removeData(UUID userId) {
+        // Delete child records for each note before deleting notes
         List<Note> notes = noteRepository.findAllByUserId(userId);
         notes.forEach(note -> {
             summaryRepository.getSummaryByNoteId(note.getId())
@@ -269,6 +281,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             Attachment attachment = new Attachment();
 
+            // Reuse the existing attachment id when the path already exists
             Optional<Attachment> optionalAttachment = attachmentRepository.findByPathAndUserId(path, user.getId());
 
             optionalAttachment.ifPresent(value -> attachment.setId(value.getId()));
@@ -300,6 +313,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public ResponseOperation moveAttachment(String token, String oldPath, String newPath) {
         ResponseUser user = jwtService.getTokenInfo(token);
 
+        // Attachment paths are kept in sync with local file moves
         Attachment attachment = attachmentRepository.findByPathAndUserId(oldPath, user.getId())
                 .orElseThrow(() -> new NotFoundException("Attachment not found!"));
 

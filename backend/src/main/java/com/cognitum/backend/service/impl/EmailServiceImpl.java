@@ -15,8 +15,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendEmail(String email, Long confirmCode, Boolean isChangePassword) {
+        // Use a different subject depending on why the code was requested
         String subject = isChangePassword ? "Confirmation Code for Password Change" : "Confirmation Code for Email Confirmation";
         try {
+            // Build and send a simple HTML-capable confirmation email
             MimeMessage mimeMessage = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
             helper.setText("Your confirmation code : " + confirmCode, true);

@@ -15,6 +15,7 @@ export function useDirectoryWatcher(path: string | null, onChanged: (changedPath
 
         invoke("watch_dir", { path });
 
+        // If there are any changes, call the onChanged method
         listen<string[]>("fs-change", (event) => {
             onChangedRef.current(event.payload);
         }).then((unlisten) => {
