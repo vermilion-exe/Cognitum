@@ -15,7 +15,7 @@ import java.util.UUID;
 public interface NoteRepository extends JpaRepository<Note, Long> {
 
     List<Note> findAllByUserId(UUID userId);
-    Optional<Note> findByUserIdAndPath(UUID userId, String path);
+    Optional<Note> findFirstByUserIdAndPathOrderByLastUpdatedDesc(UUID userId, String path);
     @Query("SELECT n FROM Note n WHERE n.userId = :userId AND n.lastUpdated > :timestamp")
     List<Note> findAllByUserIdAndLastUpdatedAfter(UUID userId, OffsetDateTime timestamp);
 

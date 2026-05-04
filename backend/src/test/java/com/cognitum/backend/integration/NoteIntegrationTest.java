@@ -175,6 +175,47 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
+        @DisplayName("should update existing note with same path when id is omitted")
+        void shouldUpdateExistingNoteWithSamePathWhenIdIsOmitted() {
+            RequestNote createRequest = new RequestNote(null, "Original content.", "testnote", null, null);
+            Response createResponse = given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .contentType(ContentType.JSON)
+                    .body(createRequest)
+                    .when()
+                    .post("/api/cognitum/note")
+                    .then()
+                    .statusCode(200)
+                    .extract()
+                    .response();
+
+            Long noteId = createResponse.jsonPath().getLong("id");
+            RequestNote updateRequest = new RequestNote(null, "Updated content.", "testnote", null, null);
+
+            given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .contentType(ContentType.JSON)
+                    .body(updateRequest)
+                    .when()
+                    .post("/api/cognitum/note")
+                    .then()
+                    .statusCode(200)
+                    .contentType(ContentType.JSON)
+                    .body("id", equalTo(noteId.intValue()))
+                    .body("path", equalTo("testnote"))
+                    .body("text", equalTo("Updated content."));
+
+            given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .when()
+                    .get("/api/cognitum/note")
+                    .then()
+                    .statusCode(200)
+                    .contentType(ContentType.JSON)
+                    .body("$", hasSize(1));
+        }
+
+        @Test
         @DisplayName("should return 401 when unowned note is updated")
         void shouldReturn401ForUnownedNote() {
             // Create a note with another user

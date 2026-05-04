@@ -37,37 +37,38 @@ public class NoteServiceImpl implements NoteService {
     public ResponseNote createNote(String token, RequestNote request) {
         ResponseUser user = jwtService.getTokenInfo(token);
 
-        Note note = new Note();
         OffsetDateTime requestLastUpdated = request.getLastUpdated() != null
                 ? request.getLastUpdated()
                 : OffsetDateTime.now();
+        Note note;
 
         if (request.getId() != null) {
-            Note existingNote = noteRepository.findById(request.getId())
+            note = noteRepository.findById(request.getId())
                     .orElseThrow(() -> new NotFoundException("Note not found"));
 
-            if (!existingNote.getUserId().equals(user.getId())) {
+            if (!note.getUserId().equals(user.getId())) {
                 throw new UnauthorizedException("Cannot modify another user's note");
             }
-
-            if (existingNote.getLastUpdated() != null && requestLastUpdated.isBefore(existingNote.getLastUpdated())) {
-                return new ResponseNote(existingNote.getId(), existingNote.getText(), existingNote.getPath(), existingNote.getCreatedAt(), existingNote.getLastUpdated());
-            }
-
-            note.setFlashcards(existingNote.getFlashcards());
-            note.setExplanations(existingNote.getExplanations());
+        } else {
+            note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), request.getPath())
+                    .orElseGet(Note::new);
         }
 
-        note.setId(request.getId());
+        if (note.getId() != null && note.getLastUpdated() != null && requestLastUpdated.isBefore(note.getLastUpdated())) {
+            return toResponseNote(note);
+        }
+
         note.setText(request.getText());
         note.setPath(request.getPath());
         note.setUserId(user.getId());
-        note.setCreatedAt(request.getCreatedAt() != null ? request.getCreatedAt() : OffsetDateTime.now());
+        note.setCreatedAt(request.getCreatedAt() != null
+                ? request.getCreatedAt()
+                : note.getCreatedAt() != null ? note.getCreatedAt() : OffsetDateTime.now());
         note.setLastUpdated(requestLastUpdated);
 
         Note savedNote = noteRepository.save(note);
 
-        return new ResponseNote(savedNote.getId(), savedNote.getText(), savedNote.getPath(), savedNote.getCreatedAt(), savedNote.getLastUpdated());
+        return toResponseNote(savedNote);
     }
 
     @Override
@@ -79,7 +80,7 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public ResponseNote getNoteByPath(String token, String path) {
         ResponseUser user = jwtService.getTokenInfo(token);
-        Note note = noteRepository.findByUserIdAndPath(user.getId(), path)
+        Note note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), path)
                 .orElseThrow(() -> new NotFoundException("Note not found"));
 
         return new ResponseNote(note.getId(), note.getText(), note.getPath(), note.getCreatedAt(), note.getLastUpdated());
@@ -98,7 +99,7 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public ResponseNote moveNote(String token, String oldPath, String newPath) {
         ResponseUser user = jwtService.getTokenInfo(token);
-        Note note = noteRepository.findByUserIdAndPath(user.getId(), oldPath)
+        Note note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), oldPath)
                 .orElseThrow(() -> new NotFoundException("Note not found"));
 
         note.setPath(newPath);
@@ -110,12 +111,16 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public ResponseOperation deleteNote(String token, String path) {
         ResponseUser user = jwtService.getTokenInfo(token);
-        Note note = noteRepository.findByUserIdAndPath(user.getId(), path)
+        Note note = noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(user.getId(), path)
                 .orElseThrow(() -> new NotFoundException("Note not found"));
 
         noteRepository.delete(note);
 
         return new ResponseOperation(true);
+    }
+
+    private ResponseNote toResponseNote(Note note) {
+        return new ResponseNote(note.getId(), note.getText(), note.getPath(), note.getCreatedAt(), note.getLastUpdated());
     }
 
 }

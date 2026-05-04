@@ -118,12 +118,65 @@ class NoteServiceImplTest {
     }
 
     @Test
+    void createNote_withoutIdWhenPathExists_updatesExistingNote() {
+        when(jwtService.getTokenInfo(mockToken)).thenReturn(mockUser);
+
+        OffsetDateTime originalCreatedAt = OffsetDateTime.now().minusDays(1);
+        Note existingNote = createNote("Original content");
+        existingNote.setId(7L);
+        existingNote.setPath("/test/path");
+        existingNote.setCreatedAt(originalCreatedAt);
+        existingNote.setLastUpdated(OffsetDateTime.now().minusHours(1));
+
+        RequestNote requestNote = new RequestNote();
+        requestNote.setText("Updated content");
+        requestNote.setPath("/test/path");
+        requestNote.setLastUpdated(OffsetDateTime.now());
+
+        when(noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(mockUser.getId(), "/test/path"))
+                .thenReturn(Optional.of(existingNote));
+        when(noteRepository.save(any(Note.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ResponseNote result = noteService.createNote(mockToken, requestNote);
+
+        assertEquals(7L, result.getId());
+        assertEquals("Updated content", result.getText());
+        assertEquals(originalCreatedAt, result.getCreatedAt());
+        verify(noteRepository).save(existingNote);
+    }
+
+    @Test
+    void createNote_withoutIdWhenPathExistsAndRequestIsOlder_doesNotOverwrite() {
+        when(jwtService.getTokenInfo(mockToken)).thenReturn(mockUser);
+
+        OffsetDateTime existingLastUpdated = OffsetDateTime.now();
+        Note existingNote = createNote("Newer content");
+        existingNote.setId(7L);
+        existingNote.setPath("/test/path");
+        existingNote.setLastUpdated(existingLastUpdated);
+
+        RequestNote requestNote = new RequestNote();
+        requestNote.setText("Older content");
+        requestNote.setPath("/test/path");
+        requestNote.setLastUpdated(existingLastUpdated.minusMinutes(1));
+
+        when(noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(mockUser.getId(), "/test/path"))
+                .thenReturn(Optional.of(existingNote));
+
+        ResponseNote result = noteService.createNote(mockToken, requestNote);
+
+        assertEquals(7L, result.getId());
+        assertEquals("Newer content", result.getText());
+        verify(noteRepository, never()).save(any(Note.class));
+    }
+
+    @Test
     void getNoteByPath_whenNoteExists_returnsNote() {
         when(jwtService.getTokenInfo(mockToken)).thenReturn(mockUser);
 
         Note existingNote = createNote("Existing note");
         existingNote.setPath("/existing/path");
-        when(noteRepository.findByUserIdAndPath(mockUser.getId(), "/existing/path"))
+        when(noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(mockUser.getId(), "/existing/path"))
                 .thenReturn(Optional.of(existingNote));
 
         ResponseNote result = noteService.getNoteByPath(mockToken, "/existing/path");
@@ -135,7 +188,7 @@ class NoteServiceImplTest {
     @Test
     void getNoteByPath_whenNoteNotFound_throwsException() {
         when(jwtService.getTokenInfo(mockToken)).thenReturn(mockUser);
-        when(noteRepository.findByUserIdAndPath(any(), any())).thenReturn(Optional.empty());
+        when(noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(any(), any())).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> noteService.getNoteByPath(mockToken, "/nonexistent"));
     }
@@ -146,7 +199,7 @@ class NoteServiceImplTest {
 
         Note existingNote = createNote("Note to move");
         existingNote.setPath("/old/path");
-        when(noteRepository.findByUserIdAndPath(mockUser.getId(), "/old/path"))
+        when(noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(mockUser.getId(), "/old/path"))
                 .thenReturn(Optional.of(existingNote));
         when(noteRepository.save(any(Note.class))).thenReturn(existingNote);
 
@@ -162,7 +215,7 @@ class NoteServiceImplTest {
 
         Note existingNote = createNote("Note to delete");
         existingNote.setPath("/to/delete");
-        when(noteRepository.findByUserIdAndPath(mockUser.getId(), "/to/delete"))
+        when(noteRepository.findFirstByUserIdAndPathOrderByLastUpdatedDesc(mockUser.getId(), "/to/delete"))
                 .thenReturn(Optional.of(existingNote));
 
         ResponseOperation result = noteService.deleteNote(mockToken, "/to/delete");
