@@ -13,8 +13,8 @@ test('can register', async () => {
 
     await expect(tauriPage).toHaveURL(/.*register/);
 
-    await tauriPage.getByLabel('Username').fill('farhadgaraisa');
-    await tauriPage.getByLabel('Email').fill('farhad.garaisa@gmail.com');
+    await tauriPage.getByLabel('Username').fill('test');
+    await tauriPage.getByLabel('Email').fill('testuser@test.com');
     await tauriPage.getByLabel('Password').fill('testpassword123');
 
     await tauriPage.getByRole('button', { name: 'Register' }).click();

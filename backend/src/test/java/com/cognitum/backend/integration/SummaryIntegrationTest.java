@@ -8,6 +8,7 @@ import com.cognitum.backend.dto.response.ResponseSummary;
 import com.cognitum.backend.entity.User;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.repository.SummaryRepository;
+import com.cognitum.backend.repository.TokenRepository;
 import com.cognitum.backend.repository.UserRepository;
 import com.cognitum.backend.service.EmailService;
 import io.restassured.RestAssured;
@@ -34,6 +35,9 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TokenRepository tokenRepository;
 
     @Autowired
     private NoteRepository noteRepository;
@@ -87,6 +91,8 @@ public class SummaryIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         RestAssured.baseURI = "http://localhost:" + super.port;
+        tokenRepository.deleteAll();
+        userRepository.deleteAll();
         getUser();
         noteRepository.deleteAll();
         summaryRepository.deleteAll();

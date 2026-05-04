@@ -12,8 +12,8 @@ test.beforeAll(async () => {
 
     await expect(tauriPage).toHaveURL(/.*register/);
 
-    await tauriPage.getByLabel('Username').fill('farhadgaraisa');
-    await tauriPage.getByLabel('Email').fill('farhad.garaisa@gmail.com');
+    await tauriPage.getByLabel('Username').fill('test');
+    await tauriPage.getByLabel('Email').fill('testuser@test.com');
     await tauriPage.getByLabel('Password').fill('testpassword123');
 
     await tauriPage.getByRole('button', { name: 'Register' }).click();
@@ -93,7 +93,7 @@ test('can generate summary', async () => {
     await tauriPage.getByRole('button', { name: 'SummarizeButton' }).click();
 
     // Wait for summary to appear
-    await expect(tauriPage.getByLabel('SummaryContent')).toBeVisible();
+    await expect(tauriPage.getByLabel('SummaryContent')).toBeVisible({ timeout: 0 });
     await tauriPage.waitForTimeout(7000);
     await tauriPage.getByRole('button', { name: 'CloseSummary' }).click();
 

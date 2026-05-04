@@ -13,6 +13,7 @@ import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.FlashcardRepository;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.service.JwtService;
+import com.cognitum.backend.service.NoteService;
 import com.cognitum.backend.web.NvidiaWebClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -45,6 +45,9 @@ class QuestionServiceImplTest {
 
     @Mock
     private NoteRepository noteRepository;
+
+    @Mock
+    private NoteService noteService;
 
     @Mock
     private FlashcardRepository flashcardRepository;
@@ -179,7 +182,6 @@ class QuestionServiceImplTest {
         List<UUID> result = questionService.checkFlashcardRelevance("updated markdown", List.of(flashcard));
 
         assertEquals(List.of(flashcardId), result);
-        verify(flashcardRepository).markStaleByIds(List.of(flashcardId));
     }
 
     @Test

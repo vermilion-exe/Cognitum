@@ -70,8 +70,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         if (applicationProperties.getIsDevMode())
             user.setIsActive(true);
-        else
-            emailService.sendEmail(user.getEmail(), confirmationCode, false);
+        else{
+                user.setIsActive(false);
+                emailService.sendEmail(user.getEmail(), confirmationCode, false);
+        }
 
         User savedUser = userRepository.save(user);
         if(savedUser.getId() != null){
@@ -269,6 +271,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     flashcardRepository.deleteById(flashcard.getId()));
         });
         noteRepository.deleteAll(notes);
+
+        attachmentRepository.deleteAllByUserId(userId);
     }
 
     @Override

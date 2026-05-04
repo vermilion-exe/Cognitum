@@ -63,7 +63,7 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
                 .as(ResponseAuthentication.class);
     }
 
-    private Long getNote(String accessToken, RequestNote requestNote) {
+    private ResponseNote getNote(String accessToken, RequestNote requestNote) {
         return given()
                 .header("Authorization", "Bearer " + accessToken)
                 .contentType(ContentType.JSON)
@@ -73,15 +73,62 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
                 .then()
                 .statusCode(200)
                 .extract()
-                .as(ResponseNote.class)
-                .getId();
+                .as(ResponseNote.class);
     }
 
-    private List<ResponseFlashcard> getFlashcards(String accessToken, Long noteId) {
-        return given()
-                .header("Authorization", "Bearer " +accessToken)
+    private List<ResponseFlashcard> generateFlashcards(String accessToken, String markdown) {
+        int maxAttempts = 3;
+        long delayMs = 15000;
+
+        RuntimeException lastException = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return given()
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(ContentType.JSON)
+                        .queryParam("markdown", markdown)
+                        .queryParam("count", 5)
+                        .when()
+                        .post("/api/cognitum/question/flashcards")
+                        .then()
+                        .statusCode(200)
+                        .extract()
+                        .as(new TypeRef<List<ResponseFlashcard>>() {});
+            } catch (RuntimeException e) {
+                lastException = e;
+
+                if (attempt == maxAttempts) {
+                    throw e;
+                }
+
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Retry interrupted", interruptedException);
+                }
+            }
+        }
+
+        throw lastException;
+    }
+
+    private void createFlashcards(String accessToken, List<ResponseFlashcard> flashcards) {
+        given()
+                .header("Authorization", "Bearer " + accessToken)
                 .contentType(ContentType.JSON)
-                .post("/api/cognitum/question/flashcards?noteId=" + noteId + "&count=5")
+                .body(flashcards)
+                .post("/api/cognitum/question")
+                .then()
+                .statusCode(200);
+    }
+
+    private List<ResponseFlashcard> getFlashcardsByNoteId(String accessToken, Long noteId) {
+        return given()
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(ContentType.JSON)
+                .get("/api/cognitum/question/flashcards?noteId=" + noteId)
                 .then()
                 .statusCode(200)
                 .extract()
@@ -104,8 +151,8 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
         tokenRepository.deleteAll();
         userRepository.deleteAll();
         getUser();
-        noteRepository.deleteAll();
         flashcardRepository.deleteAll();
+        noteRepository.deleteAll();
         doNothing().when(emailService).sendEmail(anyString(), anyLong(), anyBoolean());
     }
 
@@ -119,12 +166,12 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note first
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(auth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
 
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .post("/api/cognitum/question/flashcards?noteId=" + noteId + "&count=5")
+                    .post("/api/cognitum/question/flashcards?markdown=" + note.getText() + "&count=5")
                     .then()
                     .statusCode(200)
                     .body(notNullValue());
@@ -142,21 +189,20 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note first
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(auth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
 
             // Generate flashcards for the note
-            getFlashcards(auth.getAccessToken(), noteId);
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
 
             // Modify the note content
-            RequestNote updateNote = new RequestNote(noteId, "Main principles of economics", "testnote", null, null);
-
-            getNote(auth.getAccessToken(), updateNote);
+            String modifiedMarkdown = "Main principles of economics";
 
             // Get the irrelevant flashcard IDs
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .get("/api/cognitum/question/relevance?noteId=" + noteId)
+                    .body(flashcards)
+                    .get("/api/cognitum/question/relevance?markdown=" + modifiedMarkdown)
                     .then()
                     .statusCode(200)
                     .body(notNullValue());
@@ -168,19 +214,119 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note first
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(auth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
 
             // Generate flashcards for the note
-            getFlashcards(auth.getAccessToken(), noteId);
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
 
             // Get the irrelevant flashcard IDs for unmodified note
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .get("/api/cognitum/question/relevance?noteId=" + noteId)
+                    .body(flashcards)
+                    .get("/api/cognitum/question/relevance?markdown=" + note.getText())
                     .then()
                     .statusCode(200)
                     .body("$", empty());
+        }
+
+    }
+
+    @Nested
+    @DisplayName("POST /api/cognitum/question")
+    class FlashcardCreationTests {
+
+        @Test
+        @DisplayName("Should create flashcards for a note")
+        void shouldCreateFlashcardsForANote() {
+            // Create a note first
+            RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
+
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
+
+            // Generate flashcards for the note
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
+
+            flashcards.forEach(fc -> fc.setNoteId(note.getId()));
+
+            // Create flashcards
+            given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .contentType(ContentType.JSON)
+                    .body(flashcards)
+                    .post("/api/cognitum/question")
+                    .then()
+                    .statusCode(200)
+                    .body("success", equalTo(true));
+        }
+
+        @Test
+        @DisplayName("Should return 400 when noteId is missing in flashcard")
+        void shouldReturn400WhenNoteIdIsMissingInFlashcard() {
+            // Create a note first
+            RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
+
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
+
+            // Generate flashcards for the note
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
+
+            // Try to create flashcards without setting noteId
+            given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .contentType(ContentType.JSON)
+                    .body(flashcards)
+                    .post("/api/cognitum/question")
+                    .then()
+                    .statusCode(400);
+        }
+
+        @Test
+        @DisplayName("Should return 404 when non-existent noteId provided in flashcard")
+        void shouldReturn404WhenNonExistentNoteIdProvidedInFlashcard() {
+            // Generate flashcards for a non-existent note
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), "SOLID principles");
+
+            flashcards.forEach(fc -> fc.setNoteId(9999L));
+
+            // Try to create flashcards with non-existent noteId
+            given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .contentType(ContentType.JSON)
+                    .body(flashcards)
+                    .post("/api/cognitum/question")
+                    .then()
+                    .statusCode(404);
+        }
+
+        @Test
+        @DisplayName("Should return 401 when unowned noteId provided in flashcard")
+        void shouldReturn401WhenUnownedNoteIdProvidedInFlashcard() {
+            // Create another user
+            RequestRegister otherUserRequest = new RequestRegister("otheruser", "otheruser@test.com", "otherpassword123");
+            ResponseAuthentication otherAuth = registerUser(otherUserRequest);
+            User otherUser = userRepository.findByEmail(otherUserRequest.getEmail()).orElseThrow(() -> new RuntimeException("user not found."));
+            otherUser.setIsActive(true);
+            userRepository.save(otherUser);
+
+            // Create a note for that user
+            RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
+
+            ResponseNote note = getNote(otherAuth.getAccessToken(), noteRequest);
+
+            // Generate flashcards for the note
+            List<ResponseFlashcard> flashcards = generateFlashcards(otherAuth.getAccessToken(), note.getText());
+
+            flashcards.forEach(fc -> fc.setNoteId(note.getId()));
+
+            // Try to create flashcards with unowned noteId
+            given()
+                    .header("Authorization", "Bearer " + auth.getAccessToken())
+                    .contentType(ContentType.JSON)
+                    .body(flashcards)
+                    .post("/api/cognitum/question")
+                    .then()
+                    .statusCode(401);
         }
 
     }
@@ -195,21 +341,27 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note first
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(auth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
 
             // Generate flashcards for the note
-            ResponseFlashcard flashcard = getFlashcards(auth.getAccessToken(), noteId).get(0);
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
 
-            flashcard.setEasinessFactor(2.5);
-            flashcard.setInterval(1);
-            flashcard.setRepetitions(1);
-            flashcard.setNextReview(LocalDate.now().plusDays(1));
+            flashcards.forEach(fc -> fc.setNoteId(note.getId()));
+
+            createFlashcards(auth.getAccessToken(), flashcards);
+
+            ResponseFlashcard createdFlashcard = getFlashcardsByNoteId(auth.getAccessToken(), note.getId()).get(0);
+
+            createdFlashcard.setEasinessFactor(2.5);
+            createdFlashcard.setInterval(1);
+            createdFlashcard.setRepetitions(1);
+            createdFlashcard.setNextReview(LocalDate.now().plusDays(1));
 
             // Submit the flashcard review
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .body(flashcard)
+                    .body(createdFlashcard)
                     .post("/api/cognitum/question/review")
                     .then()
                     .statusCode(200)
@@ -242,16 +394,22 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note for that user
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(otherAuth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(otherAuth.getAccessToken(), noteRequest);
 
             // Generate flashcards for the note
-            ResponseFlashcard flashcard = getFlashcards(otherAuth.getAccessToken(), noteId).get(0);
+            List<ResponseFlashcard> flashcards = generateFlashcards(otherAuth.getAccessToken(), note.getText());
+
+            flashcards.forEach(fc -> fc.setNoteId(note.getId()));
+
+            createFlashcards(otherAuth.getAccessToken(), flashcards);
+
+            ResponseFlashcard otherUserFlashcard = getFlashcardsByNoteId(otherAuth.getAccessToken(), note.getId()).get(0);
 
             // Submit the flashcard review with the current user
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .body(flashcard)
+                    .body(otherUserFlashcard)
                     .post("/api/cognitum/question/review")
                     .then()
                     .statusCode(401);
@@ -269,16 +427,20 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note first
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(auth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
 
             // Generate flashcards for the note
-            getFlashcards(auth.getAccessToken(), noteId);
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
+
+            flashcards.forEach(fc -> fc.setNoteId(note.getId()));
+
+            createFlashcards(auth.getAccessToken(), flashcards);
 
             // Get the  flashcards for the note
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .get("/api/cognitum/question/flashcards?noteId=" + noteId)
+                    .get("/api/cognitum/question/flashcards?noteId=" + note.getId())
                     .then()
                     .statusCode(200)
                     .body(notNullValue());
@@ -308,13 +470,13 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note for that user
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(otherAuth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(otherAuth.getAccessToken(), noteRequest);
 
             // Try to access the note flashcards with current user
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .get("/api/cognitum/question/flashcards?noteId=" + noteId)
+                    .get("/api/cognitum/question/flashcards?noteId=" + note.getId())
                     .then()
                     .statusCode(401);
         }
@@ -331,13 +493,13 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note first
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(auth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(auth.getAccessToken(), noteRequest);
 
             // Generate flashcards for the note
-            getFlashcards(auth.getAccessToken(), noteId);
+            List<ResponseFlashcard> flashcards = generateFlashcards(auth.getAccessToken(), note.getText());
 
             // Modify the note content
-            RequestNote updateNote = new RequestNote(noteId, "Main principles of economics", "testnote", null, null);
+            RequestNote updateNote = new RequestNote(note.getId(), "Main principles of economics", "testnote", null, null);
 
             getNote(auth.getAccessToken(), updateNote);
 
@@ -345,7 +507,8 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             List<UUID> flashcardIds = given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .get("/api/cognitum/question/relevance?noteId=" + noteId)
+                    .body(flashcards)
+                    .get("/api/cognitum/question/relevance?markdown=" + note.getText())
                     .then()
                     .statusCode(200)
                     .extract()
@@ -355,7 +518,7 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .delete("/api/cognitum/question/flashcards/stale?noteId=" + noteId)
+                    .delete("/api/cognitum/question/flashcards/stale?noteId=" + note.getId())
                     .then()
                     .statusCode(200)
                     .body("success", equalTo(true));
@@ -387,13 +550,13 @@ public class QuestionIntegrationTest  extends BaseIntegrationTest {
             // Create a note for that user
             RequestNote noteRequest = new RequestNote(null, "SOLID principles", "testnote", null, null);
 
-            Long noteId = getNote(otherAuth.getAccessToken(), noteRequest);
+            ResponseNote note = getNote(otherAuth.getAccessToken(), noteRequest);
 
             // Try to delete the note flashcards with current user
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
                     .contentType(ContentType.JSON)
-                    .delete("/api/cognitum/question/flashcards/stale?noteId=" + noteId)
+                    .delete("/api/cognitum/question/flashcards/stale?noteId=" + note.getId())
                     .then()
                     .statusCode(401);
         }

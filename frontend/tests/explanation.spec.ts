@@ -12,8 +12,8 @@ test.beforeAll(async () => {
 
     await expect(tauriPage).toHaveURL(/.*register/);
 
-    await tauriPage.getByLabel('Username').fill('farhadgaraisa');
-    await tauriPage.getByLabel('Email').fill('farhad.garaisa@gmail.com');
+    await tauriPage.getByLabel('Username').fill('test');
+    await tauriPage.getByLabel('Email').fill('testuser@test.com');
     await tauriPage.getByLabel('Password').fill('testpassword123');
 
     await tauriPage.getByRole('button', { name: 'Register' }).click();
@@ -73,18 +73,14 @@ test('can explain text', async () => {
 
     await expect(tauriPage.getByText('Explain the laws of thermodynamics.')).toBeVisible();
 
-    await tauriPage.waitForTimeout(500);
-
     // Select the text and press explain button
     await editor.selectText();
 
     await tauriPage.getByRole('button', { name: 'ExplainText' }).click();
 
-    await tauriPage.waitForTimeout(7000);
-
     // Find and open explanation
     let explanation = tauriPage.locator('.highlight-explanation');
-    await explanation.click();
+    await explanation.click({ timeout: 120000 });
 
     // Ensure content exists
     await expect(tauriPage.getByLabel('ExplanationContent')).toBeVisible();

@@ -94,6 +94,7 @@ pub fn run() {
             note::save_note_timestamp,
             note::get_local_note_timestamp,
             note::remove_local_note_timestamp,
+            note::delete_note_metadata,
             note::move_note,
             note::get_notes_since, // New command for polling
             note::get_note_by_path,

@@ -85,21 +85,45 @@ public class ExplanationIntegrationTest extends BaseIntegrationTest {
     }
 
     private String explainText(String token, String text) {
-        return given()
-                .header("Authorization", "Bearer " + token)
-                .contentType(ContentType.JSON)
-                .body(text)
-                .when()
-                .post("/api/cognitum/explanation/explain")
-                .then()
-                .statusCode(200)
-                .extract()
-                .response()
-                .as(ResponseCompletion.class)
-                .getChoices()
-                .get(0)
-                .getMessage()
-                .getContent();
+        int maxAttempts = 3;
+        long delayMs = 15000;
+
+        RuntimeException lastException = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return given()
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(ContentType.JSON)
+                        .body(text)
+                        .when()
+                        .post("/api/cognitum/explanation/explain")
+                        .then()
+                        .statusCode(200)
+                        .extract()
+                        .response()
+                        .as(ResponseCompletion.class)
+                        .getChoices()
+                        .get(0)
+                        .getMessage()
+                        .getContent();
+            } catch (RuntimeException e) {
+                lastException = e;
+
+                if (attempt == maxAttempts) {
+                    throw e;
+                }
+
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Retry interrupted", interruptedException);
+                }
+            }
+        }
+
+        throw lastException;
     }
 
     private void createExplanation(String token, RequestHighlight requestHighlight) {
@@ -119,8 +143,8 @@ public class ExplanationIntegrationTest extends BaseIntegrationTest {
         tokenRepository.deleteAll();
         userRepository.deleteAll();
         getUser();
-        noteRepository.deleteAll();
         explanationRepository.deleteAll();
+        noteRepository.deleteAll();
         doNothing().when(emailService).sendEmail(anyString(), anyLong(), anyBoolean());
     }
 

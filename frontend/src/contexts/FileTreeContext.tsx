@@ -335,6 +335,8 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
         // If the created node is a markdown file, sync it
         if (!isDirectory) {
             const now = new Date().toISOString();
+            console.log(newPath);
+            console.log(now);
             await invoke("save_note_timestamp", { path: newPath, timestamp: now });
 
             if (syncEnabled) {

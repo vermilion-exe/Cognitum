@@ -12,6 +12,7 @@ import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.ExplanationRepository;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.service.JwtService;
+import com.cognitum.backend.service.NoteService;
 import com.cognitum.backend.web.NvidiaWebClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class ExplanationServiceImplTest {
 
     @Mock
     private NoteRepository noteRepository;
+
+    @Mock
+    private NoteService noteService;
 
     @Mock
     private ExplanationRepository explanationRepository;

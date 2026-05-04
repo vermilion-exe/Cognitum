@@ -8,6 +8,7 @@ import com.cognitum.backend.entity.Summary;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.repository.SummaryRepository;
 import com.cognitum.backend.service.JwtService;
+import com.cognitum.backend.service.NoteService;
 import com.cognitum.backend.web.AISummaryWebClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ class SummaryServiceImplTest {
 
     @Mock
     private NoteRepository noteRepository;
+
+    @Mock
+    private NoteService noteService;
 
     @InjectMocks
     private SummaryServiceImpl summaryService;

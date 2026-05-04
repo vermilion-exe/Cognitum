@@ -5,6 +5,7 @@ import com.cognitum.backend.dto.request.RequestRegister;
 import com.cognitum.backend.dto.response.ResponseAuthentication;
 import com.cognitum.backend.entity.User;
 import com.cognitum.backend.repository.NoteRepository;
+import com.cognitum.backend.repository.TokenRepository;
 import com.cognitum.backend.repository.UserRepository;
 import com.cognitum.backend.service.EmailService;
 import io.restassured.RestAssured;
@@ -28,6 +29,9 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private NoteRepository noteRepository;
+
+    @Autowired
+    private TokenRepository tokenRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -66,6 +70,8 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         RestAssured.baseURI = "http://localhost:" + super.port;
+        tokenRepository.deleteAll();
+        userRepository.deleteAll();
         getUser();
         noteRepository.deleteAll();
         doNothing().when(emailService).sendEmail(anyString(), anyLong(), anyBoolean());
@@ -333,7 +339,7 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
             // Get notes since a past timestamp
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
-                    .queryParam("timestamp", "2000-01-01T00:00:00")
+                    .queryParam("timestamp", "2000-01-01T00:00:00Z")
                     .when()
                     .get("/api/cognitum/note/since")
                     .then()
@@ -361,7 +367,7 @@ public class NoteIntegrationTest extends BaseIntegrationTest {
             // Get notes since a future timestamp
             given()
                     .header("Authorization", "Bearer " + auth.getAccessToken())
-                    .queryParam("timestamp", "3000-01-01T00:00:00")
+                    .queryParam("timestamp", "3000-01-01T00:00:00Z")
                     .when()
                     .get("/api/cognitum/note/since")
                     .then()

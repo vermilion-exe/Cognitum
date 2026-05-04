@@ -61,6 +61,7 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
             await invoke("delete_local_highlight_data");
             await invoke("delete_local_flashcards");
             await invoke("delete_app_data");
+            await invoke("delete_note_metadata");
         }
         catch (e) {
             console.error("Could not delete account:", e);

@@ -203,3 +203,14 @@ pub async fn remove_local_note_timestamp(app: AppHandle, path: String) -> Result
     let json = serde_json::to_string_pretty(&mappings).map_err(|e| e.to_string())?;
     fs::write(&mappings_path, json).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn delete_note_metadata(app: AppHandle) -> Result<(), String> {
+    let mappings_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("note_metadata.json");
+
+    fs::remove_file(&mappings_path).map_err(|e| e.to_string())
+}

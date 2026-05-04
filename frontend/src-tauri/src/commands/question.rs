@@ -392,7 +392,7 @@ pub async fn delete_local_flashcards(state: State<'_, AppState>) -> Result<(), S
     };
 
     for (_, filename) in mappings {
-        let _ = remove_local_flashcards_internal(&state, filename);
+        let _ = remove_local_flashcards_internal(&state, filename).await?;
     }
 
     fs::remove_file(&mappings_path).map_err(|e| e.to_string())

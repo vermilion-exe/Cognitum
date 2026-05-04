@@ -11,6 +11,7 @@ import com.cognitum.backend.entity.User;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.ResourceConflictException;
 import com.cognitum.backend.properties.ApplicationProperties;
+import com.cognitum.backend.repository.AttachmentRepository;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.repository.TokenRepository;
 import com.cognitum.backend.repository.UserRepository;
@@ -46,6 +47,9 @@ class AuthenticationServiceImplTest {
 
     @Mock
     private NoteRepository noteRepository;
+
+    @Mock
+    private AttachmentRepository attachmentRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;

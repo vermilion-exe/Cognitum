@@ -242,6 +242,9 @@ public class QuestionServiceImpl implements QuestionService {
         // Convert the API shape into a Flashcard entity
         Flashcard flashcard = new Flashcard();
         flashcard.setId(request.getId());
+        if (request.getNoteId() == null) {
+            throw new BadRequestException("Note ID is required for flashcard creation");
+        }
         Note note = noteRepository.findById(request.getNoteId())
                         .orElseThrow(() -> new NotFoundException("Note not found"));
         if(!note.getUserId().equals(user.getId())) {

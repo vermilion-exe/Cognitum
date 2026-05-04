@@ -346,6 +346,8 @@ On macOS or Linux:
 
 ### Frontend E2E Tests
 
+> [!NOTE]
+> Current E2E tests can only be executed on Windows, as Playwright requires Chromium to connect to and interact with the Tauri application.
 Make sure the backend is running in dev mode and the Tauri application is running in test mode:
 
 ```bash
@@ -357,6 +359,14 @@ In another terminal, from the `frontend` directory, run Playwright:
 ```bash
 npx playwright test
 ```
+
+To use the UI for tests, add the `--ui` flag to the command.
+```bash
+npx playwright test --ui
+```
+
+> [!IMPORTANT]
+> Nvidia NIM services can sometimes respond slowly. If tests involving AI generation fail due to timeouts or delayed responses, rerun them multiple times before treating the result as a genuine failure.
 
 ### Summary Model Evaluation
 
