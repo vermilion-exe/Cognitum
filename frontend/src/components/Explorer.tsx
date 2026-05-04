@@ -33,25 +33,27 @@ function Explorer() {
 
     const handleNameSelection = async () => {
         if (createType === "directory") {
-            const newPath = root?.id.concat("\\" + nodeName);
-            if (findNodeShallow(root, newPath!)) {
+            if (!root?.id) return;
+            const newPath = await join(root.id, nodeName);
+            if (findNodeShallow(root, newPath)) {
                 toast.warning("Directory with this name already exists");
                 console.log("Directory already exists");
                 return;
             }
 
             // await invoke("create_directory", { path: newPath });
-            createNode(root?.id!, nodeName, true);
+            createNode(root.id, nodeName, true);
         }
         else {
-            const newPath = root?.id.concat("\\" + nodeName + ".md");
-            if (findNodeShallow(root, newPath!)) {
+            if (!root?.id) return;
+            const newPath = await join(root.id, `${nodeName}.md`);
+            if (findNodeShallow(root, newPath)) {
                 toast.warning("File with this name already exists");
                 console.log("File already exists");
                 return;
             }
 
-            createNode(root?.id!, nodeName, false);
+            createNode(root.id, nodeName, false);
         }
 
         setCreateType(undefined);
@@ -85,9 +87,9 @@ function Explorer() {
 
     const moveNotes = async (node: FsNode, parentPath: string) => {
         if (node.kind === "dir") {
+            const newDirPath = await join(parentPath, node.name);
             await Promise.all((node.children ?? []).map(async (child) => {
-                const newPath = await join(parentPath, child.name);
-                await moveNotes(child, newPath);
+                await moveNotes(child, newDirPath);
             }));
             return;
         }
@@ -121,7 +123,7 @@ function Explorer() {
             return;
         }
 
-        const newPath = `${targetId}\\${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`;
+        const newPath = await join(targetId, `${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`);
 
         if (findNodeInDir(root, targetId, newPath)) {
             toast.warning("Node in given directory already exists");

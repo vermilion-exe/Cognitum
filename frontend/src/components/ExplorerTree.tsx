@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useActiveFile } from "../contexts/ActiveFileContext";
 import { useFileTree } from "../contexts/FileTreeContext";
 import { invoke } from "@tauri-apps/api/core";
-import { findNode, findNodeInDir, toRelativePath } from "../utils/fsUtils";
+import { areSamePath, findNode, findNodeInDir, isPathInsideDir, toRelativePath } from "../utils/fsUtils";
 import { join } from "@tauri-apps/api/path";
 import { createPortal } from "react-dom";
 import { useToast } from "../hooks/useToast";
@@ -133,9 +133,9 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
 
     const moveNotes = async (node: FsNode, parentPath: string) => {
         if (node.kind === "dir") {
-            await Promise.all((node.children ?? []).map(async (node) => {
-                const newPath = await join(parentPath, node.name);
-                await moveNotes(node, newPath);
+            const newDirPath = await join(parentPath, node.name);
+            await Promise.all((node.children ?? []).map(async (child) => {
+                await moveNotes(child, newDirPath);
             }));
             return;
         }
@@ -151,7 +151,7 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
     }
 
     const isDescendant = (parentId: string, childId: string): boolean => {
-        return childId.startsWith(parentId + "\\");
+        return isPathInsideDir(childId, parentId) && !areSamePath(parentId, childId);
     }
 
     const performDrop = async (targetId: string) => {
@@ -163,15 +163,15 @@ function TreeRow({ node, pipes, isLast, isOpen, isActive, toggleOpen, }: { node:
             : draggedNode?.id.slice(0, -(draggedNode?.name.length));
 
         if (!draggedNode) return;
-        else if (draggedNode.id === targetId) return;
-        else if (targetId === root?.id) {
-            if (targetId === base) return;
+        else if (areSamePath(draggedNode.id, targetId)) return;
+        else if (areSamePath(targetId, root?.id)) {
+            if (areSamePath(targetId, base)) return;
         }
         else {
             if (isDescendant(targetId, draggedNode.id)) return;
         }
 
-        const newPath = `${targetId}\\${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`;
+        const newPath = await join(targetId, `${draggedNode.name}${draggedNode.kind === "file" ? ".md" : ""}`);
 
         if (findNodeInDir(root, targetId, newPath)) {
             toast.warning("Node in given directory already exists");

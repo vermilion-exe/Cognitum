@@ -8,6 +8,7 @@ import type { ResponseHighlight } from "../types/ResponseHighlight";
 import type { ResponseFlashcard } from "../types/ResponseFlashcard";
 import {
     collectAllNodes,
+    areSamePath,
     findFilesInDir,
     findNode,
     getFileNodes,
@@ -364,7 +365,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
         const node = findNode(root, nodeId);
         if (!node) return;
 
-        if (node.id === activeFileId) {
+        if (areSamePath(node.id, activeFileId)) {
             setActiveFileId(undefined);
         }
 
@@ -449,7 +450,7 @@ export const FileTreeProvider = ({ children }: { children: React.ReactNode }) =>
 
         isAppChangeRef.current = true;
 
-        if (node.id === activeFileId) {
+        if (areSamePath(node.id, activeFileId)) {
             setActiveFileId(undefined);
         }
 

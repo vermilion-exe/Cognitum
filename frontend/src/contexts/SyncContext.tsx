@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { SyncStatus } from "../types/SyncStatus";
 import { RequestNote } from "../types/RequestNote";
 import { useActiveFile } from "./ActiveFileContext";
-import { collectAllNodes, isImage, toRelativePath } from "../utils/fsUtils";
+import { areSamePath, collectAllNodes, isImage, normalizePath, toRelativePath } from "../utils/fsUtils";
 import { invoke } from "@tauri-apps/api/core";
 import { useUser } from "./UserContext";
 import { ResponseSummary } from "../types/ResponseSummary";
@@ -309,7 +309,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const downloadDbNote = async (note: RequestNote, fullPath: string | undefined) => {
         // DB version won the timestamp check, so write it locally
         console.log("DB note is newer for note with path", note.path);
-        if (activeFileId === fullPath)
+        if (areSamePath(activeFileId, fullPath))
             setActiveFileId(undefined);
         markAppFileWrite(fullPath!);
         await invoke("create_file", { path: fullPath, contents: note.text });
@@ -337,7 +337,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         if (progress.completed_note_ids.includes(note.id!)) return;
 
         const matchedNode = nodes_with_paths.find(
-            ({ relativePath }) => relativePath === note.path
+            ({ relativePath }) => areSamePath(relativePath, note.path)
         );
         const fullPath = await getFullPath(note.path);
         const { localTimestamp, localLastUpdated } = await getLocalLastUpdated(fullPath, matchedNode);
@@ -432,7 +432,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
 
         await Promise.all(nodes_with_paths.map(async (node_with_path) => {
-            const db_exists = db_notes.some(file => file.path === node_with_path.relativePath);
+            const db_exists = db_notes.some(file => areSamePath(file.path, node_with_path.relativePath));
 
             if (!db_exists) {
                 await uploadNewLocalNote(node_with_path, progress);
@@ -457,7 +457,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         // Sync attachments that already exist in the DB
         await Promise.all(db_images.map(async (image) => {
             const matchedImage = images_with_paths.find(
-                ({ relativePath }) => relativePath === image.path
+                ({ relativePath }) => areSamePath(relativePath, image.path)
             );
 
             if (matchedImage && (new Date(matchedImage.image.lastModified!) > new Date(image.last_updated))) {
@@ -475,7 +475,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const syncNewLocalImages = async (images_with_paths: ImageWithRelativePath[], db_images: ResponseAttachment[]) => {
         // Upload local images that do not exist in the DB yet
         await Promise.all(images_with_paths.map(async (image_with_path) => {
-            const db_exists = db_images.some(image => image.path === image_with_path.relativePath);
+            const db_exists = db_images.some(image => areSamePath(image.path, image_with_path.relativePath));
 
             if (!db_exists) {
                 const lastModified = !image_with_path.image.lastModified ? null : new Date(image_with_path.image.lastModified).toISOString();
@@ -546,7 +546,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             await Promise.all(new_notes.map(async (note) => {
                 const fullPath = await getFullPath(note.path);
                 const matchedNode = nodes_with_paths.find(
-                    ({ relativePath }) => relativePath === note.path
+                    ({ relativePath }) => areSamePath(relativePath, note.path)
                 );
 
                 const localTimestamp = await invoke<string | null>("get_local_note_timestamp", { path: fullPath });
@@ -598,7 +598,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const cfg = await invoke<{ vaultPath?: string }>("load_config");
 
         if (cfg.vaultPath) {
-            return await join(cfg.vaultPath, relativePath);
+            return await join(cfg.vaultPath, normalizePath(relativePath));
         }
         else {
             console.error("File not found: ", relativePath);

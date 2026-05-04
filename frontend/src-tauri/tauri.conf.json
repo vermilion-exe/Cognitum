@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "cognitum-frontend",
-        "width": 800,
-        "height": 600,
+        "width": 1400,
+        "height": 1000,
+        "minWidth": 1000,
+        "minHeight": 480,
         "decorations": false,
         "transparent": true,
         "additionalBrowserArgs": "--remote-debugging-port=9222"

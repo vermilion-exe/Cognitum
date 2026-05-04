@@ -17,23 +17,13 @@ import { createHighlightPlugin, setFullReplaceMeta, setHighlightsMeta, setLoadin
 import { useSyncManager } from "../hooks/useSyncManager";
 import { useSyncStatus } from "../contexts/SyncContext";
 import { RequestNote } from "../types/RequestNote";
-import { collectAllNodes, isImageNode, toRelativePath } from "../utils/fsUtils";
+import { areSamePath, collectAllNodes, isImageNode, isPathInsideDir, toRelativePath } from "../utils/fsUtils";
 import { useFileTree } from "../contexts/FileTreeContext";
 
 const AUTOSAVE_DELAY_MS = 300;
 const IMAGE_EXTENSIONS = ["apng", "png", "avif", "gif", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "svg", "webp"];
 
 type FileWithPath = File & { path?: string };
-
-const normalizePath = (path: string) => path.replace(/\\/g, "/").toLowerCase();
-
-// Check if a path is inside a given directory
-const isPathInsideDir = (path: string, dir: string) => {
-    const normalizedPath = normalizePath(path);
-    const normalizedDir = normalizePath(dir).replace(/\/+$/, "");
-
-    return normalizedPath === normalizedDir || normalizedPath.startsWith(`${normalizedDir}/`);
-};
 
 // Get the original path of a file
 const getOriginalFilePath = (file: File) => {
@@ -257,7 +247,7 @@ const TextEditor = forwardRef<TextEditorHandle, TextEditorProps>(
                                 .find((node) =>
                                     node.kind === "file" &&
                                     isImageNode(node) &&
-                                    normalizePath(node.id) === normalizePath(originalPath)
+                                    areSamePath(node.id, originalPath)
                                 ) : undefined;
                             if (node) {
                                 return convertFileSrc(node.id);
