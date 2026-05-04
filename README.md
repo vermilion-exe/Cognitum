@@ -157,6 +157,8 @@ JWT_SECRET_KEY=
 TEST_JWT_SECRET_KEY=
 ```
 
+Spring Boot imports this file automatically from `backend/.env` when the app is run from the repository root or from the `backend` directory. No IntelliJ run configuration changes are required.
+
 Environment variables:
 
 * `DB_PASSWORD`: Password for the PostgreSQL user configured in `backend/src/main/resources/application.yml`.

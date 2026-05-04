@@ -1,4 +1,5 @@
 AI/summarizer_ckpt/
 AI/lightning_logs/
 AI/models
+.env
 .idea
