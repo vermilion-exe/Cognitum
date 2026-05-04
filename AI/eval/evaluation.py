@@ -3,26 +3,19 @@
 
 import argparse
 
-import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from nltk.translate.bleu_score import corpus_bleu
-from rouge_score import rouge_scorer
-from bert_score import score as bert_score
-
-from lib.math_protection import (
-    protect_math_spans,
-    restore_math_spans,
-    build_math_bad_words_ids,
-    fix_balance_factor_formula,
-)
-from lib.structure import add_structure_markers, split_by_headings
-from lib.generation import hierarchical_summarize
-
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model_dir", "./models/final_model")
-    ap.add_argument("--test_data", "./data/summ/test.jsonl")
+    ap.add_argument(
+        "--model_dir",
+        default="./models/final_model",
+        help="Path to the trained model directory.",
+    )
+    ap.add_argument(
+        "--test_data",
+        default="./data/summ/test.jsonl",
+        help="Path to the test dataset file.",
+    )
     ap.add_argument("--max_input_len", type=int, default=4096)
     ap.add_argument("--overlap_ratio", type=float, default=0.15)
     ap.add_argument("--max_new_tokens", type=int, default=256)
@@ -44,10 +37,19 @@ def main():
     ap.add_argument(
         "--bert_device",
         type=str,
-        default="cuda" if torch.cuda.is_available() else "cpu",
-        help="Device for BERTScore model",
+        default=None,
+        help="Device for BERTScore model. Defaults to cuda when available, otherwise cpu.",
     )
     args = ap.parse_args()
+
+    import torch
+    from bert_score import score as bert_score
+    from nltk.translate.bleu_score import corpus_bleu
+    from rouge_score import rouge_scorer
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+    if args.bert_device is None:
+        args.bert_device = "cuda" if torch.cuda.is_available() else "cpu"
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
     model = AutoModelForSeq2SeqLM.from_pretrained(args.model_dir)
@@ -127,6 +129,15 @@ def main():
 
 
 def _summarize_text(raw: str, model, tokenizer, args) -> str:
+    from lib.generation import hierarchical_summarize
+    from lib.math_protection import (
+        build_math_bad_words_ids,
+        fix_balance_factor_formula,
+        protect_math_spans,
+        restore_math_spans,
+    )
+    from lib.structure import add_structure_markers, split_by_headings
+
     protected, mapping = protect_math_spans(
         raw, args.num_math_placeholders
     )
