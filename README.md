@@ -167,6 +167,9 @@ Environment variables:
 * `JWT_SECRET_KEY`: Secret key used to sign application JWTs.
 * `TEST_JWT_SECRET_KEY`: Secret key used by tests.
 
+> [!NOTE]
+> NVIDIA NIM responses used by the explanation and flashcard AI features can sometimes be slow depending on the time of day and current service load. If these features appear delayed, allow the request extra time before assuming they are not working.
+
 The default backend configuration expects a local PostgreSQL database named `cognitum` and schema named `cognitum_data`:
 
 ```sql
@@ -390,8 +393,9 @@ Run the script with `--help` to see the complete argument list.
 ## Troubleshooting
 
 * If the backend cannot connect to PostgreSQL, confirm that the `cognitum` database exists, the `cognitum_data` schema exists, and `DB_PASSWORD` matches the configured datasource user.
-* If account confirmation emails are not sent, confirm `app.is-test-mode` is `false`, the configured Gmail account matches the app password, and SMTP access is enabled.
+* If account confirmation emails are not sent or you receive template responses from the AI models, confirm `app.is-test-mode` is `false`, the configured Gmail account matches the app password, and SMTP access is enabled.
 * If summarisation fails in the app, confirm the LitServe API is running on `http://localhost:8000` or update `app.summarizer.client.base-url` in `backend/src/main/resources/application.yml`.
+* If explanation or flashcard generation appears unresponsive, wait a little longer before retrying because NVIDIA NIM response times can vary depending on the time of day and current service load.
 * If Playwright tests cannot find the app, confirm `npm run tauri:test` is still running before launching `npx playwright test`.
 
 ## Contact
