@@ -197,7 +197,7 @@ spring:
 
 After the tables are created, change it back to `update` or another appropriate setting.
 
-User account confirmation is automatic by default. To require email activation codes, set test mode to `false`:
+User account confirmation and AI generation is automatic by default. To require email activation codes and genuine responses from AI models, set test mode to `false`:
 
 ```yml
 app:
