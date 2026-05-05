@@ -1,11 +1,12 @@
 use std::future::Future;
 
 use reqwest::{Client, Response, StatusCode};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 
 use crate::{
     commands::{auth::refresh_token, config::load_token},
+    entities::api_error::ApiError,
     AppState,
 };
 
@@ -14,14 +15,25 @@ pub enum AuthMode {
     Bearer,
 }
 
+#[derive(Deserialize, Serialize)]
+struct ErrorResponse {
+    message: Option<String>,
+    detail: Option<String>,
+}
+
 pub async fn decode_response<T: for<'de> Deserialize<'de>>(
     response: Response,
-) -> Result<T, String> {
+) -> Result<T, ApiError> {
     let status = response.status();
     let text = response.text().await.map_err(|e| e.to_string())?;
 
     if !status.is_success() {
-        let err = format!("Request failed with status {}: {}", status, text);
+        let message = serde_json::from_str::<ErrorResponse>(&text)
+            .ok()
+            .and_then(|error| error.message.or(error.detail))
+            .filter(|message| !message.is_empty())
+            .unwrap_or_else(|| text.clone());
+        let err = ApiError::new(status.as_u16(), message);
         eprintln!("{}", err);
         return Err(err);
     }
@@ -29,15 +41,15 @@ pub async fn decode_response<T: for<'de> Deserialize<'de>>(
     serde_json::from_str::<T>(&text).map_err(|e| {
         let err = format!("Decode error: {} | Body was: {}", e, text);
         eprintln!("{}", err);
-        err
+        ApiError::from(err)
     })
 }
 
-pub async fn send_request<T, F, Fut>(
+pub async fn send_request_api_error<T, F, Fut>(
     state: &AppState,
     auth_mode: AuthMode,
     build_request: F,
-) -> Result<T, String>
+) -> Result<T, ApiError>
 where
     T: for<'de> Deserialize<'de>,
     F: Fn(&Client, Option<&str>) -> Fut,
@@ -64,7 +76,7 @@ where
                     Ok(token) => token,
                     Err(e) => {
                         state.app_handle.emit("auth:logout", ()).unwrap();
-                        return Err(e);
+                        return Err(e.into());
                     }
                 };
 
@@ -78,4 +90,19 @@ where
             decode_response(response).await
         }
     }
+}
+
+pub async fn send_request<T, F, Fut>(
+    state: &AppState,
+    auth_mode: AuthMode,
+    build_request: F,
+) -> Result<T, String>
+where
+    T: for<'de> Deserialize<'de>,
+    F: Fn(&Client, Option<&str>) -> Fut,
+    Fut: Future<Output = Result<Response, reqwest::Error>>,
+{
+    send_request_api_error(state, auth_mode, build_request)
+        .await
+        .map_err(|e| e.to_string())
 }

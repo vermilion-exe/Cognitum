@@ -6,6 +6,7 @@ import { useUser } from '../contexts/UserContext';
 import { RequestRegister } from '../types/RequestRegister';
 import { ResponseAuth } from '../types/ResponseAuth';
 import { useToast } from '../hooks/useToast';
+import { isApiError } from '../types/ApiError';
 
 function Register() {
     const [username, setUsername] = useState('');
@@ -48,7 +49,22 @@ function Register() {
                     navigate('/mainPage');
                 }
             })
-            .catch((e) => {
+            .catch((e: unknown) => {
+                if (isApiError(e)) {
+                    if (e.status === 409) {
+                        toast.warning("An account with this email already exists");
+                        return;
+                    }
+
+                    if (e.status === 400) {
+                        toast.error("Please check your registration details");
+                        return;
+                    }
+
+                    toast.error(e.message || "Register failed");
+                    return;
+                }
+
                 toast.error("Register failed due to an error");
                 console.error("Register failed: ", e);
             });

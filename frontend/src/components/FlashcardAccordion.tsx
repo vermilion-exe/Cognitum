@@ -20,6 +20,7 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
     const [queue, setQueue] = useState<ResponseFlashcard[]>(() => flashcards.filter((f) => f.next_review <= today).sort((a, b) => a.next_review.localeCompare(b.next_review)));
 
     useEffect(() => {
+        console.log(flashcards);
         if (!flashcards) return;
         if (flashcards.find((flashcard) => flashcard.is_stale)) {
             setHasStaleFlashcards(true);

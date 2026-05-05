@@ -1,6 +1,7 @@
 use reqwest::Client;
 
 use crate::commands::config::{load_token, save_token_internal};
+use crate::entities::api_error::ApiError;
 use crate::entities::request_attachment::RequestAttachment;
 use crate::entities::request_auth::RequestAuth;
 use crate::entities::request_change_password::RequestChangePassword;
@@ -10,7 +11,7 @@ use crate::entities::request_register::RequestRegister;
 use crate::entities::response_attachment::ResponseAttachment;
 use crate::entities::response_auth::ResponseAuth;
 use crate::entities::response_operation::ResponseOperation;
-use crate::utils::{send_request, AuthMode};
+use crate::utils::{send_request, send_request_api_error, AuthMode};
 use crate::AppState;
 use reqwest::multipart;
 use std::fs;
@@ -20,10 +21,10 @@ use std::path::Path;
 pub async fn request_register(
     request: RequestRegister,
     state: tauri::State<'_, AppState>,
-) -> Result<ResponseAuth, String> {
+) -> Result<ResponseAuth, ApiError> {
     let url = format!("{}/auth/register", &state.base_url);
 
-    send_request(&state, AuthMode::None, |client, _| {
+    send_request_api_error(&state, AuthMode::None, |client, _| {
         client.post(&url).json(&request).send()
     })
     .await
@@ -33,10 +34,10 @@ pub async fn request_register(
 pub async fn request_auth(
     request: RequestAuth,
     state: tauri::State<'_, AppState>,
-) -> Result<ResponseAuth, String> {
+) -> Result<ResponseAuth, ApiError> {
     let url = format!("{}/auth/authenticate", &state.base_url);
 
-    send_request(&state, AuthMode::None, |client, _| {
+    send_request_api_error(&state, AuthMode::None, |client, _| {
         client.post(&url).json(&request).send()
     })
     .await

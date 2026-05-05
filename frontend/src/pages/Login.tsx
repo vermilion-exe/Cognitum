@@ -6,6 +6,7 @@ import { RequestAuth } from '../types/RequestAuth';
 import { ResponseAuth } from '../types/ResponseAuth';
 import { useUser } from '../contexts/UserContext';
 import { useToast } from '../hooks/useToast';
+import { isApiError } from '../types/ApiError';
 
 function Login() {
     const [email, setEmail] = useState('');
@@ -42,7 +43,22 @@ function Login() {
                     navigate('/mainPage');
                 }
             })
-            .catch((e) => {
+            .catch((e: unknown) => {
+                if (isApiError(e)) {
+                    if (e.status === 400) {
+                        toast.error("Invalid email or password");
+                        return;
+                    }
+
+                    if (e.status === 404) {
+                        toast.error("No account found for that email");
+                        return;
+                    }
+
+                    toast.error(e.message || "Login failed");
+                    return;
+                }
+
                 toast.error("Login failed due to an error");
                 console.error("Login failed: ", e);
             });

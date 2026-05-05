@@ -42,6 +42,11 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
             await invoke("clear_user");
             await invoke("clear_token", { isRefreshToken: false });
             await invoke("clear_token", { isRefreshToken: true });
+            await invoke("delete_local_summaries");
+            await invoke("delete_local_highlight_data");
+            await invoke("delete_local_flashcards");
+            await invoke("delete_app_data");
+            await invoke("delete_note_metadata");
         }
         catch (e) {
             console.error("Could not log out:", e);
