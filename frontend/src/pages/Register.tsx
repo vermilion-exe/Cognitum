@@ -8,6 +8,38 @@ import { ResponseAuth } from '../types/ResponseAuth';
 import { useToast } from '../hooks/useToast';
 import { isApiError } from '../types/ApiError';
 
+const EMAIL_VALIDATION_MESSAGE = "Enter a valid email address";
+const USERNAME_VALIDATION_MESSAGE = "Username must be 3-30 characters and use only letters, numbers, and underscores";
+const PASSWORD_VALIDATION_MESSAGE = "Password must be at least 8 characters and include uppercase, lowercase, and a number";
+
+function getEmailValidationError(email: string) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        return EMAIL_VALIDATION_MESSAGE;
+    }
+
+    return null;
+}
+
+function getUsernameValidationError(username: string) {
+    if (!/^[A-Za-z0-9_]{3,30}$/.test(username.trim())) {
+        return USERNAME_VALIDATION_MESSAGE;
+    }
+
+    return null;
+}
+
+function getPasswordValidationError(password: string) {
+    if (password.length < 8) {
+        return PASSWORD_VALIDATION_MESSAGE;
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+        return PASSWORD_VALIDATION_MESSAGE;
+    }
+
+    return null;
+}
+
 function Register() {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
@@ -27,7 +59,26 @@ function Register() {
     }
 
     async function handleRegister() {
-        const payload: RequestRegister = { username, email, password };
+        const emailValidationError = getEmailValidationError(email);
+        const usernameValidationError = getUsernameValidationError(username);
+        const passwordValidationError = getPasswordValidationError(password);
+
+        if (emailValidationError) {
+            toast.warning(emailValidationError);
+            return;
+        }
+
+        if (usernameValidationError) {
+            toast.warning(usernameValidationError);
+            return;
+        }
+
+        if (passwordValidationError) {
+            toast.warning(passwordValidationError);
+            return;
+        }
+
+        const payload: RequestRegister = { username: username.trim(), email: email.trim(), password };
         await invoke<ResponseAuth>("request_register", { request: payload })
             .then(async (result) => {
                 setUser({ userId: result.user_id, email: result.email, username: result.username, is_active: result.is_active });
@@ -57,7 +108,7 @@ function Register() {
                     }
 
                     if (e.status === 400) {
-                        toast.error("Please check your registration details");
+                        toast.error(e.message || "Please check your registration details");
                         return;
                     }
 
@@ -90,7 +141,7 @@ function Register() {
                     </span>
                 </label>
                 <label htmlFor='Password' className='relative'>
-                    <input type='password' id='Password' placeholder='' value={password} onChange={(e) => setPassword(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
+                    <input type='password' id='Password' placeholder='' value={password} autoComplete='new-password' onChange={(e) => setPassword(e.target.value)} className='peer mt-0.5 w-full rounded shadow-sm sm:text-sm border-gray-600 bg-gray-900 text-white' />
 
                     <span className='absolute inset-y-2.5 start-3 -translate-y-4.5 px-0.5 text-sm font-medium transition-transform peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-4.5 text-white'>
                         Password

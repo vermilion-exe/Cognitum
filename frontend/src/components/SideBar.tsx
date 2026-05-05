@@ -2,7 +2,7 @@ import explorerIcon from '../assets/explorer.svg';
 import settingsIcon from '../assets/settings.svg';
 import helpIcon from '../assets/help.svg';
 import { useState } from 'react';
-import SettingsAccordion from './SettingsAccordion';
+import SettingsModal from './SettingsModal';
 import Manual from './Manual';
 
 function SideBar({ explorerHidden, setExplorerHidden }: { explorerHidden: boolean, setExplorerHidden: any }) {
@@ -20,7 +20,7 @@ function SideBar({ explorerHidden, setExplorerHidden }: { explorerHidden: boolea
             {/*<button><img className="w-5 h-5 mx-1 hover:bg-background-secondary rounded-sm" src={userIcon} /></button>*/}
             <button onClick={() => setManualHidden(false)}><img className="w-5 h-5 mx-1 hover:bg-background-secondary rounded-sm" src={helpIcon} /></button>
             {!settingsHidden && (
-                <SettingsAccordion setSettingsHidden={setSettingsHidden} />
+                <SettingsModal setSettingsHidden={setSettingsHidden} />
             )}
             {!manualHidden && (
                 <Manual setIsManualHidden={setManualHidden} />

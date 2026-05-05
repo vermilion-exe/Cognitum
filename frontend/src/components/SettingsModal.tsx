@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import Switch from "@mui/material/Switch";
 import { useSyncStatus } from "../contexts/SyncContext";
 
-function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: boolean) => void; }) {
+function SettingsModal({ setSettingsHidden }: { setSettingsHidden: (hidden: boolean) => void; }) {
     const { user } = useUser();
     const [noteDirectory, setNoteDirectory] = useState("");
     const { syncEnabled, setSyncEnabled } = useSyncStatus();
@@ -252,4 +252,4 @@ function SettingsAccordion({ setSettingsHidden }: { setSettingsHidden: (hidden: 
     );
 }
 
-export default SettingsAccordion
+export default SettingsModal

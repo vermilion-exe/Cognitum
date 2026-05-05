@@ -1,10 +1,9 @@
 import { useRef, useState } from "react";
-import { EditorOptionScreen, ExplanationAccordion, FileView, SummaryAccordion, TextEditor } from "../components";
+import { EditorOptionScreen, ExplanationModal, FileView, SummaryModal, FlashardModal, TextEditor } from "../components";
 import { TextEditorHandle } from "../components/TextEditor";
 import { useHighlights } from "../hooks/useHighlights";
 import { useSummary } from "../hooks/useSummary";
 import { useFlashcards } from "../hooks/useFlashcards";
-import FlashcardAccordion from "../components/FlashcardAccordion";
 import { useActiveFile } from "../contexts/ActiveFileContext";
 import { findNode } from "../utils/fsUtils";
 import { useFileTree } from "../contexts/FileTreeContext";
@@ -62,18 +61,18 @@ function MainPage() {
             </div>
 
             {isSummaryOpen && (
-                <SummaryAccordion isLoading={isSummaryLoading} text={renderedHtml} onClose={() => {
+                <SummaryModal isLoading={isSummaryLoading} text={renderedHtml} onClose={() => {
                     setIsSummaryOpen(false);
                 }} onRegenerate={handleSummarize} hasEnoughChars={hasEnoughChars} />
             )}
             {activeHighlight && activeHighlightId &&
-                (<ExplanationAccordion
+                (<ExplanationModal
                     activeHighlight={activeHighlight}
                     setActiveHighlightId={setActiveHighlightId}
                     onRegenerate={handleRegenerate}
                     onDelete={handleDelete} />)}
             {flashcards && isFlashcardOverlayOpen &&
-                (<FlashcardAccordion flashcards={flashcards}
+                (<FlashardModal flashcards={flashcards}
                     reviewCard={reviewCard}
                     setIsFlashcardOverlayOpen={setIsFlashcardOverlayOpen}
                     flashcardsLoading={flashcardsLoading}

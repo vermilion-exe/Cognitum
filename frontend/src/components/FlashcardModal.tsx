@@ -2,7 +2,7 @@ import { ResponseFlashcard } from "../types/ResponseFlashcard";
 import { CardReview } from '../types/CardReview';
 import { useEffect, useState } from 'react';
 
-function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen, flashcardsLoading, replaceStaleFlashcards, deleteFlashcard, replaceFlashcard }:
+function FlashcardModal({ flashcards, reviewCard, setIsFlashcardOverlayOpen, flashcardsLoading, replaceStaleFlashcards, deleteFlashcard, replaceFlashcard }:
     {
         flashcards: ResponseFlashcard[];
         reviewCard: (key: String, review: CardReview) => void;
@@ -134,4 +134,4 @@ function FlashcardAccordion({ flashcards, reviewCard, setIsFlashcardOverlayOpen,
     );
 }
 
-export default FlashcardAccordion
+export default FlashcardModal

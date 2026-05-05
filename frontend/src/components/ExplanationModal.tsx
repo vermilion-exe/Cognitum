@@ -4,7 +4,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { ResponseHighlight } from "../types/ResponseHighlight";
 
-function ExplanationAccordion({ activeHighlight, setActiveHighlightId, onRegenerate, onDelete }:
+function ExplanationModal({ activeHighlight, setActiveHighlightId, onRegenerate, onDelete }:
     { activeHighlight: ResponseHighlight; setActiveHighlightId: (id: string | null) => void; onRegenerate: (id: string) => Promise<void>; onDelete: (id: string) => void }) {
     return (
         <div
@@ -68,4 +68,4 @@ function ExplanationAccordion({ activeHighlight, setActiveHighlightId, onRegener
     );
 }
 
-export default ExplanationAccordion
+export default ExplanationModal

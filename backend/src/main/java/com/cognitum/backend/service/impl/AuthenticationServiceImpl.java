@@ -41,6 +41,10 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
 
+    private static final String EMAIL_VALIDATION_MESSAGE = "Enter a valid email address";
+    private static final String USERNAME_VALIDATION_MESSAGE = "Username must be 3-30 characters and use only letters, numbers, and underscores";
+    private static final String PASSWORD_VALIDATION_MESSAGE = "Password must be at least 8 characters and include uppercase, lowercase, and a number";
+
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
     private final NoteRepository noteRepository;
@@ -55,16 +59,22 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public ResponseEntity<ResponseAuthentication> register(RequestRegister requestRegister) {
+        validateEmail(requestRegister.getEmail());
+        validateUsername(requestRegister.getUsername());
+        validatePassword(requestRegister.getPassword());
+        String email = requestRegister.getEmail().trim();
+        String username = requestRegister.getUsername().trim();
+
         // Do not allow duplicate accounts for the same email
-        userRepository.findByEmail(requestRegister.getEmail()).ifPresent(user -> {
-            throw new ResourceConflictException("User with email " + requestRegister.getEmail() + " already exists");
+        userRepository.findByEmail(email).ifPresent(user -> {
+            throw new ResourceConflictException("User with email " + email + " already exists");
         });
 
         // Create the user and either activate immediately or send a code
         User user = new User();
-        user.setEmail(requestRegister.getEmail());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(requestRegister.getPassword()));
-        user.setUsername(requestRegister.getUsername());
+        user.setUsername(username);
         Long confirmationCode = generateRandomConfirmationCode();
         user.setCode(confirmationCode);
 
@@ -93,6 +103,32 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         return ResponseEntity.badRequest().body(new ResponseAuthentication());
+    }
+
+    private void validateEmail(String email) {
+        if (email == null || !email.trim().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new BadRequestException(EMAIL_VALIDATION_MESSAGE);
+        }
+    }
+
+    private void validateUsername(String username) {
+        if (username == null || !username.trim().matches("^[A-Za-z0-9_]{3,30}$")) {
+            throw new BadRequestException(USERNAME_VALIDATION_MESSAGE);
+        }
+    }
+
+    private void validatePassword(String password) {
+        if (password == null || password.length() < 8) {
+            throw new BadRequestException(PASSWORD_VALIDATION_MESSAGE);
+        }
+
+        boolean hasUppercase = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasLowercase = password.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+
+        if (!hasUppercase || !hasLowercase || !hasDigit) {
+            throw new BadRequestException(PASSWORD_VALIDATION_MESSAGE);
+        }
     }
 
     @Override
