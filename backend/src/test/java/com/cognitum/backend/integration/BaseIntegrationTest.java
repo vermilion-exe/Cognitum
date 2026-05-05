@@ -34,7 +34,7 @@ public abstract class BaseIntegrationTest {
     protected NvidiaWebClient nvidiaWebClient;
 
     @MockitoBean
-    protected AISummaryWebClient aiSummaryWebClient; 
+    protected AISummaryWebClient aiSummaryWebClient;
 
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17")
             .withDatabaseName("cognitum_test")

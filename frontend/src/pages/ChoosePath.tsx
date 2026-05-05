@@ -19,6 +19,7 @@ function ChoosePath() {
         if (isTestMode) {
             const baseDir = await appDataDir();
             const filePath = await join(baseDir, 'notes');
+            await invoke("create_directory", { path: filePath });
             await invoke("save_vault_path", { vaultPath: filePath });
             setPath(filePath);
             return;

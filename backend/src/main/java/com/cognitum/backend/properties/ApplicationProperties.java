@@ -11,6 +11,6 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app")
 public class ApplicationProperties {
 
-    private Boolean isDevMode;
+    private Boolean isTestMode;
 
 }

@@ -41,10 +41,15 @@ test('can login', async () => {
 
     await expect(tauriPage).toHaveURL(/.*login/);
 
-    await tauriPage.getByLabel('Email').fill('farhad.garaisa@gmail.com');
-    await tauriPage.getByLabel('Password').fill('testpassword123');
+    await tauriPage.getByLabel('Email').fill('testuser@test.com');
+    await tauriPage.getByLabel('Password').fill('Testpassword123');
 
     await tauriPage.getByRole('button', { name: 'Login' }).click();
+
+    await expect(tauriPage).toHaveURL(/.*choosePath/, { timeout: 25000 });
+
+    await tauriPage.getByRole('img', { name: 'Browse' }).click();
+    await tauriPage.getByRole('button', { name: 'ChoosePath' }).click();
 
     await expect(tauriPage).toHaveURL(/.*mainPage/, { timeout: 15000 });
 });

@@ -3,6 +3,7 @@ package com.cognitum.backend.service.impl;
 import com.cognitum.backend.dto.request.RequestCompletion;
 import com.cognitum.backend.dto.request.RequestHighlight;
 import com.cognitum.backend.dto.request.RequestMessage;
+import com.cognitum.backend.dto.response.ResponseChoice;
 import com.cognitum.backend.dto.response.ResponseCompletion;
 import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.dto.response.ResponseUser;
@@ -11,6 +12,7 @@ import com.cognitum.backend.entity.Note;
 import com.cognitum.backend.exception.BadRequestException;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.UnauthorizedException;
+import com.cognitum.backend.properties.ApplicationProperties;
 import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.ExplanationRepository;
 import com.cognitum.backend.repository.NoteRepository;
@@ -37,9 +39,14 @@ public class ExplanationServiceImpl implements ExplanationService {
     private final ExplanationRepository explanationRepository;
     private final NoteService noteService;
     private final JwtService jwtService;
+    private final ApplicationProperties applicationProperties;
 
     @Override
     public ResponseCompletion requestExplanation(String text) {
+        if (isTestMode()) {
+            return completion("A concise test explanation for the selected concept.");
+        }
+
         // Ask the AI model for a short tutoring-style explanation
         RequestCompletion request = new RequestCompletion();
         request.setModel(nvidiaProperties.getModel());
@@ -51,6 +58,14 @@ public class ExplanationServiceImpl implements ExplanationService {
         request.setStream(false);
 
         return webClient.requestCompletion(request);
+    }
+
+    private ResponseCompletion completion(String content) {
+        return new ResponseCompletion(List.of(new ResponseChoice(new RequestMessage("assistant", content))));
+    }
+
+    private boolean isTestMode() {
+        return applicationProperties != null && Boolean.TRUE.equals(applicationProperties.getIsTestMode());
     }
 
     @Override

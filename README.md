@@ -194,11 +194,11 @@ spring:
 
 After the tables are created, change it back to `update` or another appropriate setting.
 
-User account confirmation is automatic by default. To require email activation codes, set dev mode to `false`:
+User account confirmation is automatic by default. To require email activation codes, set test mode to `false`:
 
 ```yml
 app:
-  is-dev-mode: false
+  is-test-mode: false
 ```
 
 ## Usage
@@ -365,9 +365,6 @@ To use the UI for tests, add the `--ui` flag to the command.
 npx playwright test --ui
 ```
 
-> [!IMPORTANT]
-> Nvidia NIM services can sometimes respond slowly. If tests involving AI generation fail due to timeouts or delayed responses, rerun them multiple times before treating the result as a genuine failure.
-
 ### Summary Model Evaluation
 
 Evaluation requires a trained model at `AI/models/final_model`, unless you pass a different path with `--model_dir`.
@@ -393,7 +390,7 @@ Run the script with `--help` to see the complete argument list.
 ## Troubleshooting
 
 * If the backend cannot connect to PostgreSQL, confirm that the `cognitum` database exists, the `cognitum_data` schema exists, and `DB_PASSWORD` matches the configured datasource user.
-* If account confirmation emails are not sent, confirm `app.is-dev-mode` is `false`, the configured Gmail account matches the app password, and SMTP access is enabled.
+* If account confirmation emails are not sent, confirm `app.is-test-mode` is `false`, the configured Gmail account matches the app password, and SMTP access is enabled.
 * If summarisation fails in the app, confirm the LitServe API is running on `http://localhost:8000` or update `app.summarizer.client.base-url` in `backend/src/main/resources/application.yml`.
 * If Playwright tests cannot find the app, confirm `npm run tauri:test` is still running before launching `npx playwright test`.
 

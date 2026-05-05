@@ -94,7 +94,7 @@ test('can generate summary', async () => {
 
     // Wait for summary to appear
     await expect(tauriPage.getByLabel('SummaryContent')).toBeVisible({ timeout: 0 });
-    await tauriPage.waitForTimeout(7000);
+    await tauriPage.waitForTimeout(2000);
     await tauriPage.getByRole('button', { name: 'CloseSummary' }).click();
 
     // Close the file

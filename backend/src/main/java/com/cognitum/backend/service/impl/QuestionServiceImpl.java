@@ -8,6 +8,7 @@ import com.cognitum.backend.entity.Note;
 import com.cognitum.backend.exception.BadRequestException;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.UnauthorizedException;
+import com.cognitum.backend.properties.ApplicationProperties;
 import com.cognitum.backend.properties.NvidiaProperties;
 import com.cognitum.backend.repository.FlashcardRepository;
 import com.cognitum.backend.repository.NoteRepository;
@@ -37,8 +38,13 @@ public class QuestionServiceImpl implements QuestionService {
     private final NoteService noteService;
     private final FlashcardRepository flashcardRepository;
     private final JwtService jwtService;
+    private final ApplicationProperties applicationProperties;
 
     private ResponseCompletion requestQuestions(String markdown, Integer count) {
+        if (isTestMode()) {
+            return completion(templateFlashcardsFor(markdown));
+        }
+
         // Ask the AI model to return flashcards as raw JSON
         RequestCompletion request = new RequestCompletion();
         request.setModel(nvidiaProperties.getModel());
@@ -78,6 +84,15 @@ public class QuestionServiceImpl implements QuestionService {
     @Override
     public List<UUID> checkFlashcardRelevance(String markdown, List<ResponseFlashcard> flashcards) {
         if (flashcards.isEmpty()) return List.of();
+        if (isTestMode()) {
+            String noteTopic = testTopicFor(markdown);
+            List<UUID> ids = flashcards.stream()
+                    .filter(flashcard -> !noteTopic.equals(testTopicFor(flashcard.getQuestion() + " " + flashcard.getAnswer())))
+                    .map(ResponseFlashcard::getId)
+                    .toList();
+            System.out.println(ids);
+            return ids;
+        }
 
         // Send the existing cards so the model can identify stale ones
         String flashcardsJson = flashcards.stream()
@@ -131,6 +146,62 @@ public class QuestionServiceImpl implements QuestionService {
 
         ObjectMapper objectMapper = new ObjectMapper();
         return objectMapper.readValue(content, new TypeReference<List<UUID>>() {});
+    }
+
+    private ResponseCompletion completion(String content) {
+        return new ResponseCompletion(List.of(new ResponseChoice(new RequestMessage("assistant", content))));
+    }
+
+    private String templateFlashcardsFor(String markdown) {
+        return switch (testTopicFor(markdown)) {
+            case "array-list" -> """
+                    [
+                      {"question":"How does an array list store elements?","answer":"It stores elements inside an internal array with spare capacity for additions.","type":"factual"},
+                      {"question":"Why keep free space in the internal array?","answer":"Free space lets the list add elements without allocating a new array every time.","type":"conceptual"},
+                      {"question":"When should an array list resize?","answer":"It should resize when the element count reaches the internal array length.","type":"application"},
+                      {"question":"What does the count track in an array list?","answer":"The count tracks how many positions in the internal array currently contain list elements.","type":"factual"},
+                      {"question":"How are reads and writes performed in this implementation?","answer":"They are performed directly against the internal array.","type":"application"}
+                    ]
+                    """;
+            case "crypto" -> """
+                    [
+                      {"question":"What is the role of the one-time key k?","answer":"It is a randomly generated value used for one ciphertext at a time.","type":"factual"},
+                      {"question":"Why does changing k matter for encryption?","answer":"A different k changes each ciphertext even when related plaintexts are encrypted.","type":"conceptual"},
+                      {"question":"What private value does the receiver know?","answer":"The receiver knows the matching private key x.","type":"factual"},
+                      {"question":"Why can the receiver not simply reverse the public-key process?","answer":"The ciphertext also depends on the one-time key k, which the receiver does not know.","type":"conceptual"},
+                      {"question":"What property is supported by the unknown one-time key?","answer":"It helps ensure non-repudiation in the described process.","type":"application"}
+                    ]
+                    """;
+            default -> """
+                    [
+                      {"question":"What is SOLID?","answer":"A set of object-oriented design principles.","type":"factual"},
+                      {"question":"What does SRP encourage?","answer":"A class should have one reason to change.","type":"conceptual"},
+                      {"question":"How does OCP guide extension?","answer":"Software should be open for extension and closed for modification.","type":"application"},
+                      {"question":"Why use LSP?","answer":"Subtypes should be substitutable for their base types.","type":"conceptual"},
+                      {"question":"What does DIP prefer?","answer":"Depend on abstractions rather than concrete implementations.","type":"factual"}
+                    ]
+                    """;
+        };
+    }
+
+    private String testTopicFor(String text) {
+        String normalized = text == null ? "" : text.toLowerCase();
+        if (normalized.contains("array list")
+                || normalized.contains("internal array")
+                || normalized.contains("resize")) {
+            return "array-list";
+        }
+        if (normalized.contains("ciphertext")
+                || normalized.contains("private key")
+                || normalized.contains("one-time key")
+                || normalized.contains("non-repudiation")) {
+            return "crypto";
+        }
+        return "default";
+    }
+
+    private boolean isTestMode() {
+        return applicationProperties != null && Boolean.TRUE.equals(applicationProperties.getIsTestMode());
     }
 
     @Override

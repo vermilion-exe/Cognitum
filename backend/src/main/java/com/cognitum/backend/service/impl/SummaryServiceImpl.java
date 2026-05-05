@@ -7,6 +7,7 @@ import com.cognitum.backend.entity.Note;
 import com.cognitum.backend.entity.Summary;
 import com.cognitum.backend.exception.NotFoundException;
 import com.cognitum.backend.exception.UnauthorizedException;
+import com.cognitum.backend.properties.ApplicationProperties;
 import com.cognitum.backend.repository.NoteRepository;
 import com.cognitum.backend.repository.SummaryRepository;
 import com.cognitum.backend.service.JwtService;
@@ -25,11 +26,23 @@ public class SummaryServiceImpl implements SummaryService {
     private final SummaryRepository summaryRepository;
     private final NoteRepository noteRepository;
     private final NoteService noteService;
+    private final ApplicationProperties applicationProperties;
 
     @Override
     public ResponseSummary summarize(RequestSummary requestSummary) {
+        if (isTestMode()) {
+            String markdown = requestSummary == null || requestSummary.getMarkdown() == null
+                    ? "the provided note"
+                    : requestSummary.getMarkdown();
+            return new ResponseSummary(null, "Template summary for: " + markdown, null);
+        }
+
         // Forward summarization requests to the AI summary client
         return webClient.summarize(requestSummary);
+    }
+
+    private boolean isTestMode() {
+        return applicationProperties != null && Boolean.TRUE.equals(applicationProperties.getIsTestMode());
     }
 
     @Override

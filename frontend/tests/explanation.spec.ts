@@ -80,13 +80,15 @@ test('can explain text', async () => {
 
     // Find and open explanation
     let explanation = tauriPage.locator('.highlight-explanation');
-    await explanation.click({ timeout: 120000 });
+    await explanation.click();
 
     // Ensure content exists
     await expect(tauriPage.getByLabel('ExplanationContent')).toBeVisible();
 
     // Close explanation
     await tauriPage.getByRole('button', { name: 'CloseExplanation' }).click();
+
+    await tauriPage.waitForTimeout(1000);
 
     // Close the file
     await tauriPage.getByRole('img', { name: 'File_close' }).click();
@@ -97,6 +99,8 @@ test('can explain text', async () => {
     // Open the explanation
     explanation = tauriPage.locator('.highlight-explanation');
     await explanation.click();
+
+    await tauriPage.waitForTimeout(500);
 
     // Ensure that highlight was saved
     await expect(tauriPage.getByLabel('ExplanationContent')).toBeVisible();

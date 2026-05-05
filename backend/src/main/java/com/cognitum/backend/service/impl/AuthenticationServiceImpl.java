@@ -78,7 +78,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         Long confirmationCode = generateRandomConfirmationCode();
         user.setCode(confirmationCode);
 
-        if (applicationProperties.getIsDevMode())
+        if (applicationProperties.getIsTestMode())
             user.setIsActive(true);
         else{
                 user.setIsActive(false);
