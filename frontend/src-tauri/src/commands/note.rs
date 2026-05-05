@@ -12,7 +12,7 @@ use crate::{
     AppState,
 };
 use chrono::{DateTime, Utc};
-use tauri::{AppHandle, Manager};
+use tauri::{Manager, State};
 
 #[tauri::command]
 pub async fn get_note_by_path(
@@ -131,11 +131,13 @@ pub async fn delete_note(
 
 #[tauri::command]
 pub async fn save_note_timestamp(
-    app: AppHandle,
+    state: State<'_, AppState>,
     path: String,
     timestamp: DateTime<Utc>,
 ) -> Result<(), String> {
-    let mappings_path = app
+    let _lock = state.note_metadata_lock.lock().await;
+    let mappings_path = state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
@@ -160,10 +162,12 @@ pub async fn save_note_timestamp(
 
 #[tauri::command]
 pub async fn get_local_note_timestamp(
-    app: AppHandle,
+    state: State<'_, AppState>,
     path: String,
 ) -> Result<Option<DateTime<Utc>>, String> {
-    let mappings_path = app
+    let _lock = state.note_metadata_lock.lock().await;
+    let mappings_path = state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
@@ -180,14 +184,19 @@ pub async fn get_local_note_timestamp(
 }
 
 #[tauri::command]
-pub async fn remove_local_note_timestamp(app: AppHandle, path: String) -> Result<(), String> {
-    let mappings_path = app
+pub async fn remove_local_note_timestamp(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<(), String> {
+    let _lock = state.note_metadata_lock.lock().await;
+    let mappings_path = state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("note_metadata.json");
 
-    let mut mappings: HashMap<String, String> = if mappings_path.exists() {
+    let mut mappings: HashMap<String, DateTime<Utc>> = if mappings_path.exists() {
         let text = fs::read_to_string(&mappings_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&text).map_err(|e| e.to_string())?
     } else {
@@ -205,8 +214,10 @@ pub async fn remove_local_note_timestamp(app: AppHandle, path: String) -> Result
 }
 
 #[tauri::command]
-pub async fn delete_note_metadata(app: AppHandle) -> Result<(), String> {
-    let mappings_path = app
+pub async fn delete_note_metadata(state: State<'_, AppState>) -> Result<(), String> {
+    let _lock = state.note_metadata_lock.lock().await;
+    let mappings_path = state
+        .app_handle
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?

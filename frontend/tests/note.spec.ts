@@ -14,7 +14,7 @@ test.beforeAll(async () => {
 
     await tauriPage.getByLabel('Username').fill('test');
     await tauriPage.getByLabel('Email').fill('testuser@gmail.com');
-    await tauriPage.getByLabel('Password').fill('testpassword123');
+    await tauriPage.getByLabel('Password').fill('Testpassword123');
 
     await tauriPage.getByRole('button', { name: 'Register' }).click();
 

@@ -193,7 +193,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
         console.log("Getting local notes.");
         const children = await invoke<FsNode[]>("scan_dir", {
-            path: root?.id,
+            path: root?.id!,
             recursive: true,
         });
 
@@ -460,6 +460,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 ({ relativePath }) => areSamePath(relativePath, image.path)
             );
 
+            console.log("here");
             if (matchedImage && (new Date(matchedImage.image.lastModified!) > new Date(image.last_updated))) {
                 const lastModified = !matchedImage.image.lastModified ? null : new Date(matchedImage.image.lastModified).toISOString();
                 await invoke("create_attachment", { request: { file_path: matchedImage.image.id, relative_path: image.path, last_updated: lastModified } });
@@ -521,7 +522,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             const since = new Date(syncTimestamp).toISOString();
             const new_notes = await invoke<RequestNote[]>("get_notes_since", { since: since });
             const children = root?.id ? await invoke<FsNode[]>("scan_dir", {
-                path: root.id,
+                path: root.id!,
                 recursive: true,
             }) : [];
             const nodes_with_paths = await Promise.all(

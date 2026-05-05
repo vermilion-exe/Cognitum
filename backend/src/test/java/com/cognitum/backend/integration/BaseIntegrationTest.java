@@ -2,8 +2,11 @@ package com.cognitum.backend.integration;
 
 import com.cognitum.backend.dto.request.RequestCompletion;
 import com.cognitum.backend.dto.request.RequestMessage;
+import com.cognitum.backend.dto.request.RequestSummary;
 import com.cognitum.backend.dto.response.ResponseChoice;
 import com.cognitum.backend.dto.response.ResponseCompletion;
+import com.cognitum.backend.dto.response.ResponseSummary;
+import com.cognitum.backend.web.AISummaryWebClient;
 import com.cognitum.backend.web.NvidiaWebClient;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +33,9 @@ public abstract class BaseIntegrationTest {
     @MockitoBean
     protected NvidiaWebClient nvidiaWebClient;
 
+    @MockitoBean
+    protected AISummaryWebClient aiSummaryWebClient; 
+
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17")
             .withDatabaseName("cognitum_test")
             .withUsername("test")
@@ -52,9 +58,11 @@ public abstract class BaseIntegrationTest {
     }
 
     @BeforeEach
-    void stubNvidiaResponses() {
+    void stubExternalAiResponses() {
         when(nvidiaWebClient.requestCompletion(any(RequestCompletion.class)))
                 .thenAnswer(invocation -> responseFor(invocation.getArgument(0)));
+        when(aiSummaryWebClient.summarize(any(RequestSummary.class)))
+                .thenAnswer(invocation -> summaryFor(invocation.getArgument(0)));
     }
 
     private ResponseCompletion responseFor(RequestCompletion request) {
@@ -85,6 +93,11 @@ public abstract class BaseIntegrationTest {
 
     private ResponseCompletion completion(String content) {
         return new ResponseCompletion(List.of(new ResponseChoice(new RequestMessage("assistant", content))));
+    }
+
+    private ResponseSummary summaryFor(RequestSummary request) {
+        String markdown = request == null || request.getMarkdown() == null ? "the provided note" : request.getMarkdown();
+        return new ResponseSummary(null, "Template summary for: " + markdown, null);
     }
 
 }

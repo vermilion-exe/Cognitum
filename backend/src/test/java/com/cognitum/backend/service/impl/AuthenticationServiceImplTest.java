@@ -39,6 +39,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthenticationServiceImplTest {
 
+    private static final String RAW_PASSWORD = "Testpassword123";
+    private static final String ENCODED_PASSWORD = "encodedPassword123";
+
     @Mock
     private UserRepository userRepository;
 
@@ -75,7 +78,7 @@ class AuthenticationServiceImplTest {
         mockUser.setId(UUID.randomUUID());
         mockUser.setEmail("test@example.com");
         mockUser.setUsername("testuser");
-        mockUser.setPassword("encodedPassword");
+        mockUser.setPassword(ENCODED_PASSWORD);
         mockUser.setIsActive(true);
 
         mockToken = "mock-jwt-token";
@@ -85,7 +88,7 @@ class AuthenticationServiceImplTest {
     void register_withValidData_createsUserAndReturnsResponse() {
         RequestRegister requestRegister = new RequestRegister();
         requestRegister.setEmail("newuser@example.com");
-        requestRegister.setPassword("password123");
+        requestRegister.setPassword(RAW_PASSWORD);
         requestRegister.setUsername("newuser");
 
         UUID savedUserId = UUID.randomUUID();
@@ -93,10 +96,11 @@ class AuthenticationServiceImplTest {
         savedUser.setId(savedUserId);
         savedUser.setEmail("newuser@example.com");
         savedUser.setUsername("newuser");
+        savedUser.setPassword(ENCODED_PASSWORD);
         savedUser.setIsActive(false);
 
         when(userRepository.findByEmail("newuser@example.com")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("password123")).thenReturn("encodedPassword123");
+        when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
         when(applicationProperties.getIsDevMode()).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
         when(jwtService.generateToken(savedUser)).thenReturn("jwt-token");
@@ -113,7 +117,7 @@ class AuthenticationServiceImplTest {
         assertFalse(response.getBody().getIsActive());
 
         verify(userRepository).findByEmail("newuser@example.com");
-        verify(passwordEncoder).encode("password123");
+        verify(passwordEncoder).encode(RAW_PASSWORD);
         verify(userRepository).save(any(User.class));
         verify(jwtService).generateToken(savedUser);
         verify(jwtService).generateRefreshToken(savedUser);
@@ -125,7 +129,7 @@ class AuthenticationServiceImplTest {
     void register_withExistingEmail_throwsResourceConflictException() {
         RequestRegister requestRegister = new RequestRegister();
         requestRegister.setEmail("existing@example.com");
-        requestRegister.setPassword("password123");
+        requestRegister.setPassword(RAW_PASSWORD);
         requestRegister.setUsername("newuser");
 
         when(userRepository.findByEmail("existing@example.com")).thenReturn(Optional.of(mockUser));
@@ -141,10 +145,10 @@ class AuthenticationServiceImplTest {
     void authenticate_withValidCredentials_returnsAuthenticationResponse() {
         RequestAuthentication requestAuth = new RequestAuthentication();
         requestAuth.setEmail("test@example.com");
-        requestAuth.setPassword("password123");
+        requestAuth.setPassword(RAW_PASSWORD);
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
-        when(passwordEncoder.matches("password123", "encodedPassword")).thenReturn(true);
+        when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_PASSWORD)).thenReturn(true);
         when(tokenRepository.findAllByUserId(mockUser.getId())).thenReturn(List.of());
         when(jwtService.generateToken(mockUser)).thenReturn("jwt-token");
         when(jwtService.generateRefreshToken(mockUser)).thenReturn("refresh-token");
@@ -159,7 +163,7 @@ class AuthenticationServiceImplTest {
         assertEquals(mockUser.getId(), response.getBody().getUserId());
 
         verify(userRepository).findByEmail("test@example.com");
-        verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(passwordEncoder).matches(RAW_PASSWORD, ENCODED_PASSWORD);
         verify(jwtService).generateToken(mockUser);
         verify(jwtService).generateRefreshToken(mockUser);
         verify(tokenRepository).save(any(Token.class));
@@ -169,7 +173,7 @@ class AuthenticationServiceImplTest {
     void authenticate_withInvalidEmail_throwsNotFoundException() {
         RequestAuthentication requestAuth = new RequestAuthentication();
         requestAuth.setEmail("nonexistent@example.com");
-        requestAuth.setPassword("password123");
+        requestAuth.setPassword(RAW_PASSWORD);
 
         when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
 
@@ -186,7 +190,7 @@ class AuthenticationServiceImplTest {
         requestAuth.setPassword("wrongpassword");
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
-        when(passwordEncoder.matches("wrongpassword", "encodedPassword")).thenReturn(false);
+        when(passwordEncoder.matches("wrongpassword", ENCODED_PASSWORD)).thenReturn(false);
 
         ResponseEntity<ResponseAuthentication> response = authenticationService.authenticate(requestAuth);
 
@@ -195,7 +199,7 @@ class AuthenticationServiceImplTest {
         assertNotNull(response.getBody());
 
         verify(userRepository).findByEmail("test@example.com");
-        verify(passwordEncoder).matches("wrongpassword", "encodedPassword");
+        verify(passwordEncoder).matches("wrongpassword", ENCODED_PASSWORD);
         verify(jwtService, never()).generateToken(any(User.class));
     }
 

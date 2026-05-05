@@ -61,7 +61,7 @@ public class LogoutIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should logout successfully")
         void shouldLogoutSuccessfully() {
-            var registerRequest = new RequestRegister("testuser", "testuser@test.com", "password123");
+            var registerRequest = new RequestRegister("testuser", "testuser@test.com", "Testpassword123");
             var authResponse = registerUser(registerRequest);
             User user = userRepository.findByEmail(registerRequest.getEmail()).orElseThrow(() -> new RuntimeException("user not found."));
             user.setIsActive(true);

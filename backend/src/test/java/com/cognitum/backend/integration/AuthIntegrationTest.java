@@ -69,7 +69,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should register a new user and return tokens and user info")
         void shouldRegisterNewUser() {
-            RequestRegister request = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister request = buildRequest("testuser", "testuser@test.com", "Testpassword123");
 
             ResponseAuthentication response = registerUser(request);
 
@@ -98,7 +98,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return 409 when registering with an already existing email")
         void shouldReturnConflictForDuplicateEmail() {
-            RequestRegister request = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister request = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(request); // first registration
 
             given()
@@ -113,19 +113,19 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should store a hashed password, not plaintext")
         void shouldHashPassword() {
-            RequestRegister request = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister request = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(request);
 
             var savedUser = userRepository.findByEmail("testuser@test.com")
                     .orElseThrow(() -> new AssertionError("User not found in repository"));
-            assertThat(savedUser.getPassword()).isNotEqualTo("password123");
+            assertThat(savedUser.getPassword()).isNotEqualTo("Testpassword123");
             assertThat(savedUser.getPassword()).startsWith("$2"); // bcrypt prefix
         }
 
         @Test
         @DisplayName("Should set isActive to false on registration")
         void shouldSetUserInactiveOnRegistration() {
-            RequestRegister request = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister request = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(request);
 
             var savedUser = userRepository.findByEmail("testuser@test.com")
@@ -141,12 +141,12 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should authenticate a registered user and return new tokens")
         void shouldAuthenticateRegisteredUser() {
-            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(registerRequest);
 
             given()
                     .contentType(ContentType.JSON)
-                    .body(new RequestAuthentication("testuser@test.com", "password123"))
+                    .body(new RequestAuthentication("testuser@test.com", "Testpassword123"))
                     .when()
                     .post("/api/cognitum/auth/authenticate")
                     .then()
@@ -161,7 +161,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return 400 when authenticating with wrong password")
         void shouldReturnBadRequestForWrongPassword() {
-            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(registerRequest);
 
             given()
@@ -178,7 +178,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         void shouldReturnNotFoundForUnknownUser() {
             given()
                     .contentType(ContentType.JSON)
-                    .body(new RequestAuthentication("nobody@test.com", "password123"))
+                    .body(new RequestAuthentication("nobody@test.com", "Testpassword123"))
                     .when()
                     .post("/api/cognitum/auth/authenticate")
                     .then()
@@ -188,13 +188,13 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should revoke old tokens and issue new ones on re-authentication")
         void shouldRevokeOldTokensOnReAuthentication() {
-            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(registerRequest);
 
             // Authenticate twice
             given()
                     .contentType(ContentType.JSON)
-                    .body(new RequestAuthentication("testuser@test.com", "password123"))
+                    .body(new RequestAuthentication("testuser@test.com", "Testpassword123"))
                     .when()
                     .post("/api/cognitum/auth/authenticate")
                     .then()
@@ -202,7 +202,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
 
             given()
                     .contentType(ContentType.JSON)
-                    .body(new RequestAuthentication("testuser@test.com", "password123"))
+                    .body(new RequestAuthentication("testuser@test.com", "Testpassword123"))
                     .when()
                     .post("/api/cognitum/auth/authenticate")
                     .then()
@@ -227,7 +227,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should activate user when correct confirmation code is provided")
         void shouldActivateUserWithCorrectCode() {
-            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(registerRequest);
 
             var savedUser = userRepository.findByEmail("testuser@test.com")
@@ -251,7 +251,7 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should not activate user when wrong confirmation code is provided")
         void shouldNotActivateUserWithWrongCode() {
-            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "password123");
+            RequestRegister registerRequest = buildRequest("testuser", "testuser@test.com", "Testpassword123");
             registerUser(registerRequest);
 
             given()

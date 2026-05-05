@@ -16,6 +16,7 @@ pub struct AppState {
     pub app_handle: tauri::AppHandle,
     pub highlight_mapping_lock: Mutex<()>,
     pub flashcard_mapping_lock: Mutex<()>,
+    pub note_metadata_lock: Mutex<()>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,6 +30,7 @@ pub fn run() {
                 app_handle: handle,
                 highlight_mapping_lock: Mutex::new(()),
                 flashcard_mapping_lock: Mutex::new(()),
+                note_metadata_lock: Mutex::new(()),
             });
             Ok(())
         })

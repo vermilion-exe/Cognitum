@@ -62,7 +62,7 @@ public class ExplanationIntegrationTest extends BaseIntegrationTest {
 
     private void getUser() {
         if (userRepository.findByEmail("testuser@test.com").isEmpty()) {
-            RequestRegister request = new RequestRegister("testuser", "testuser@test.com", "password123");
+            RequestRegister request = new RequestRegister("testuser", "testuser@test.com", "Testpassword123");
             auth = registerUser(request);
             User newUser = userRepository.findByEmail("testuser@test.com").orElseThrow(() -> new RuntimeException("User not found after registration"));
             newUser.setIsActive(true);
@@ -232,7 +232,7 @@ public class ExplanationIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return 401 when unowned explanation is updated")
         void shouldReturn401WhenUnownedExplanationIsUpdated() {
-            RequestRegister otherUserRequest = new RequestRegister("otheruser", "otheruser@test.com", "otherpassword123");
+            RequestRegister otherUserRequest = new RequestRegister("otheruser", "otheruser@test.com", "Otherpassword123");
             ResponseAuthentication otherAuth = registerUser(otherUserRequest);
             User otherUser = userRepository.findByEmail(otherUserRequest.getEmail()).orElseThrow(() -> new RuntimeException("user not found."));
             otherUser.setIsActive(true);
@@ -313,7 +313,7 @@ public class ExplanationIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return 401 when unowned explanation is accessed")
         void shouldReturn401WhenUnownedExplanationIsAccessed() {
-            RequestRegister otherUserRequest = new RequestRegister("otheruser", "otheruser@test.com", "otherpassword123");
+            RequestRegister otherUserRequest = new RequestRegister("otheruser", "otheruser@test.com", "Otherpassword123");
             ResponseAuthentication otherAuth = registerUser(otherUserRequest);
             User otherUser = userRepository.findByEmail(otherUserRequest.getEmail()).orElseThrow(() -> new RuntimeException("user not found."));
             otherUser.setIsActive(true);
