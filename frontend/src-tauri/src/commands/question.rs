@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs, path::Path};
 
+use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
@@ -12,19 +13,32 @@ use crate::{
     AppState,
 };
 
+#[derive(Serialize)]
+struct GenerateFlashcardsRequest<'a> {
+    markdown: &'a str,
+    count: u32,
+}
+
+#[derive(Serialize)]
+struct CheckFlashcardRelevanceRequest<'a> {
+    markdown: &'a str,
+    flashcards: &'a [ResponseFlashcard],
+}
+
 #[tauri::command]
 pub async fn generate_flashcards(
     state: State<'_, AppState>,
     markdown: String,
     count: u32,
 ) -> Result<Vec<ResponseFlashcard>, String> {
-    let url = format!("{}/question/flashcards", &state.base_url);
-    let params = [("markdown", markdown), ("count", count.to_string())];
-
-    let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+    let url = format!("{}/question/flashcards/generate", &state.base_url);
+    let body = GenerateFlashcardsRequest {
+        markdown: &markdown,
+        count,
+    };
 
     send_request(&state, AuthMode::Bearer, |client, token| {
-        let mut request = client.post(url.clone());
+        let mut request = client.post(&url).json(&body);
         if let Some(t) = token {
             request = request.bearer_auth(t);
         }
@@ -61,12 +75,13 @@ pub async fn check_flashcard_relevance(
     flashcards: Vec<ResponseFlashcard>,
 ) -> Result<Vec<String>, String> {
     let url = format!("{}/question/relevance", &state.base_url);
-    let params = [("markdown", markdown)];
-
-    let url = reqwest::Url::parse_with_params(&url, &params).map_err(|e| e.to_string())?;
+    let body = CheckFlashcardRelevanceRequest {
+        markdown: &markdown,
+        flashcards: &flashcards,
+    };
 
     send_request(&state, AuthMode::Bearer, |client, token| {
-        let mut request = client.get(url.clone()).json(&flashcards);
+        let mut request = client.post(&url).json(&body);
         if let Some(t) = token {
             request = request.bearer_auth(t);
         }

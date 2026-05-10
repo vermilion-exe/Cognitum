@@ -41,7 +41,7 @@ application:
       refresh-token-expiration: 2419200000 # 1 month
 
 app:
-  is-test-mode: true
+  is-test-mode: false
   summarizer:
     client:
       base-url: http://localhost:8000

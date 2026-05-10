@@ -3,7 +3,33 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 
+function normalizeSummaryMarkdown(text: string) {
+    if (!text) return "";
+
+    let normalized = text.trim();
+
+    try {
+        const parsed = JSON.parse(normalized);
+        if (typeof parsed === "string") {
+            normalized = parsed;
+        }
+        else if (parsed && typeof parsed.summary === "string") {
+            normalized = parsed.summary;
+        }
+    }
+    catch {
+        // The summary is usually plain markdown; only unwrap JSON when it is valid JSON.
+    }
+
+    return normalized
+        .replace(/\\r\\n/g, "\n")
+        .replace(/\\n/g, "\n")
+        .replace(/\\t/g, "\t");
+}
+
 function SummaryModal({ isLoading, text, onClose, onRegenerate, hasEnoughChars }: { isLoading: boolean; text: string; onClose: () => void; onRegenerate: () => void; hasEnoughChars: boolean; }) {
+    const summaryMarkdown = normalizeSummaryMarkdown(text);
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -37,7 +63,7 @@ function SummaryModal({ isLoading, text, onClose, onRegenerate, hasEnoughChars }
                             ) : (
                                 <div aria-label='SummaryContent'>
                                     <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
-                                        {text}
+                                        {summaryMarkdown}
                                     </Markdown>
                                 </div>
                             )

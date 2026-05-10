@@ -1,5 +1,7 @@
 package com.cognitum.backend.controller;
 
+import com.cognitum.backend.dto.request.RequestFlashcardGeneration;
+import com.cognitum.backend.dto.request.RequestFlashcardRelevance;
 import com.cognitum.backend.dto.response.ResponseFlashcard;
 import com.cognitum.backend.dto.response.ResponseOperation;
 import com.cognitum.backend.service.QuestionService;
@@ -16,9 +18,10 @@ public class QuestionController {
 
     private final QuestionService questionService;
 
-    @PostMapping("/flashcards")
-    public List<ResponseFlashcard> generateFlashcards(@RequestHeader("Authorization") String token, @RequestParam String markdown, @RequestParam Integer count) {
-        return questionService.generateFlashcards(markdown, count);
+    @PostMapping("/flashcards/generate")
+    public List<ResponseFlashcard> generateFlashcards(@RequestHeader("Authorization") String token,
+                                                      @RequestBody RequestFlashcardGeneration request) {
+        return questionService.generateFlashcards(request.getMarkdown(), request.getCount());
     }
 
     @PutMapping("/flashcards/stale")
@@ -26,9 +29,10 @@ public class QuestionController {
         return questionService.updateStaleFlashcards(token, noteId, flashcardIds);
     }
 
-    @GetMapping("/relevance")
-    public List<UUID> checkFlashcardRelevance(@RequestHeader("Authorization") String token, @RequestParam String markdown, @RequestBody List<ResponseFlashcard> flashcards) {
-        return questionService.checkFlashcardRelevance(markdown, flashcards);
+    @PostMapping("/relevance")
+    public List<UUID> checkFlashcardRelevance(@RequestHeader("Authorization") String token,
+                                              @RequestBody RequestFlashcardRelevance request) {
+        return questionService.checkFlashcardRelevance(request.getMarkdown(), request.getFlashcards());
     }
 
     @GetMapping("/due")

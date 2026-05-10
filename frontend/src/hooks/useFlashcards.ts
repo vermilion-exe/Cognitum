@@ -21,6 +21,7 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
     const reviewQueue = useRef<Map<String, CardReview>>(new Map());
     const timers = useRef<Map<String, ReturnType<typeof setTimeout>>>(new Map());
     const textDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const flashcardLoadRunRef = useRef(0);
     const { activeFileId } = useActiveFile();
     const activeFileIdRef = useRef(activeFileId);
     const prevFileIdRef = useRef(activeFileId);
@@ -57,69 +58,89 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
     useEffect(() => {
         // If no file is open, return
         if (!activeFileId || !markdown) {
+            flashcardLoadRunRef.current++;
             setFlashcardsLoading(false);
             return;
         }
 
+        const fileId = activeFileId;
+        const isNewFile = prevFileIdRef.current !== fileId;
+
         // If file change occured, set current flashcards to empty array
-        if (prevFileIdRef.current !== activeFileIdRef.current) setFlashcards([]);
-        prevFileIdRef.current = activeFileIdRef.current;
+        if (isNewFile) setFlashcards([]);
+        else if (flashcardsLoading) return;
+        prevFileIdRef.current = fileId;
 
         if (textDebounceRef.current) clearTimeout(textDebounceRef.current);
 
-        // If initial load, no delay, otherwise 2 second delay for markdown changes
-        const delay = flashcards.length === 0 && markdownRef.current.length < MIN_CHARS ? 0 : 2000;
+        const currentFlashcards = isNewFile ? [] : flashcards;
+        const delay = isNewFile || currentFlashcards.length === 0 ? 0 : 25000;
+        const runId = ++flashcardLoadRunRef.current;
 
-        setFlashcardsLoading(true);
         textDebounceRef.current = setTimeout(async () => {
-            if (flashcards.length === 0) {
-                // If no flashcards loaded, try loading local ones
-                console.log("Loading local flashcards");
-                const local_flashcards = await invoke<ResponseFlashcard[]>("load_local_flashcards", { fileId: activeFileIdRef.current! });
+            setFlashcardsLoading(true);
 
-                // If local flashcards exist, load and return
-                if (local_flashcards?.length) {
-                    console.log("local flashcards found:", local_flashcards);
-                    setFlashcards(local_flashcards);
-                    setFlashcardsLoading(false);
-                    await checkForRelevance();
-                    return;
+            try {
+                if (runId !== flashcardLoadRunRef.current || activeFileIdRef.current !== fileId) return;
+
+                if (currentFlashcards.length === 0) {
+                    // If no flashcards loaded, try loading local ones
+                    console.log("Loading local flashcards");
+                    const local_flashcards = await invoke<ResponseFlashcard[]>("load_local_flashcards", { fileId: fileId });
+
+                    if (runId !== flashcardLoadRunRef.current || activeFileIdRef.current !== fileId) return;
+
+                    // If local flashcards exist, load and return
+                    if (local_flashcards?.length) {
+                        console.log("local flashcards found:", local_flashcards);
+                        setFlashcards(local_flashcards);
+                        flashcardsRef.current = local_flashcards;
+                        await checkForRelevance(local_flashcards);
+                        return;
+                    }
+
+                    // If a note does not have enough content, return
+                    if (markdownRef.current.length < MIN_CHARS) return;
+
+                    // If there is content, generate flashcards for the note
+                    console.log("Generating flashcards");
+                    let generated_flashcards = await createFlashcards();
+
+                    if (runId !== flashcardLoadRunRef.current || activeFileIdRef.current !== fileId) return;
+
+                    if (!generated_flashcards || generated_flashcards.length === 0) {
+                        console.error("Could not generate flashcards.");
+                        return;
+                    }
+
+                    // Upload the created flashcards to DB if sync is enabled
+                    if (syncEnabled && status !== "syncing") {
+                        console.log("Syncing flashcards");
+                        const id = crypto.randomUUID();
+                        scheduleSync(`flashcard-${id}`,
+                            { type: "flashcard", operation: "create", id: String(id), payload: [...generated_flashcards.map((f) => ({ ...f, note_id: currentNoteRef.current?.id! }))] });
+                        generated_flashcards = generated_flashcards.map((f) => ({ ...f, note_id: currentNoteRef.current?.id! }));
+                    }
+
+                    console.log("saving flashcards after generation");
+
+                    await invoke("save_local_flashcards", { fileId: fileId, flashcards: generated_flashcards });
+                    await updateNoteTimestamp(fileId);
+
+                    if (runId !== flashcardLoadRunRef.current || activeFileIdRef.current !== fileId) return;
+                    setFlashcards(generated_flashcards);
                 }
-
-                // If a note does not have enough content, return
-                if (markdownRef.current.length < MIN_CHARS) { setFlashcardsLoading(false); return; };
-
-                // If there is content, generate flashcards for the note
-                console.log("Generating flashcards");
-                let generated_flashcards = await createFlashcards();
-
-                if (!generated_flashcards || generated_flashcards.length === 0) {
-                    console.error("Could not generate flashcards.");
-                    setFlashcardsLoading(false);
-                    return;
+                else {
+                    // If there are already flashcards, check their relevance
+                    if (markdownRef.current.length < MIN_CHARS) return;
+                    await checkForRelevance(currentFlashcards);
                 }
-
-                // Upload the created flashcards to DB if sync is enabled
-                if (syncEnabled && status !== "syncing") {
-                    console.log("Syncing flashcards");
-                    const id = crypto.randomUUID();
-                    scheduleSync(`flashcard-${id}`,
-                        { type: "flashcard", operation: "create", id: String(id), payload: [...generated_flashcards.map((f) => ({ ...f, note_id: currentNoteRef.current?.id! }))] });
-                    generated_flashcards = generated_flashcards.map((f) => ({ ...f, note_id: currentNoteRef.current?.id! }));
-                }
-
-                console.log("saving flashcards after generation");
-
-                await invoke("save_local_flashcards", { fileId: activeFileIdRef.current!, flashcards: generated_flashcards });
-                await updateNoteTimestamp(activeFileIdRef.current);
-                setFlashcards(generated_flashcards);
             }
-            else {
-                // If there are already flashcards, check their relevance
-                if (markdownRef.current.length < MIN_CHARS) { setFlashcardsLoading(false); return; }
-                await checkForRelevance();
+            finally {
+                if (runId === flashcardLoadRunRef.current) {
+                    setFlashcardsLoading(false);
+                }
             }
-            setFlashcardsLoading(false);
         }, delay);
 
         return () => {
@@ -128,15 +149,16 @@ export function useFlashcards({ markdownRef, markdown }: { markdownRef: RefObjec
     }, [markdown, activeFileId]);
 
     // Check flashcards for relevance and update stale flashcards
-    const checkForRelevance = async () => {
+    const checkForRelevance = async (cards = flashcardsRef.current) => {
         console.log("Checking flashcards for relevance");
-        const irrelevantIds = await invoke<String[]>("check_flashcard_relevance", { markdown: markdownRef?.current!, flashcards: flashcards });
+        const irrelevantIds = await invoke<String[]>("check_flashcard_relevance", { markdown: markdownRef?.current!, flashcards: cards });
         if (irrelevantIds.length !== 0) {
             console.log("Irrelevant flashcards found", irrelevantIds);
             setFlashcards((prev) =>
                 prev.map((f) => irrelevantIds.includes(f.id) ? { ...f, is_stale: true } : f));
 
-            const updatedFlashcards = flashcardsRef.current.map((f) => irrelevantIds.includes(f.id) ? { ...f, is_stale: true } : f);
+            const updatedFlashcards = cards.map((f) => irrelevantIds.includes(f.id) ? { ...f, is_stale: true } : f);
+            flashcardsRef.current = updatedFlashcards;
 
             await invoke("save_local_flashcards", { fileId: activeFileIdRef.current!, flashcards: updatedFlashcards });
             await updateNoteTimestamp(activeFileIdRef.current);
