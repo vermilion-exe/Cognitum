@@ -4,6 +4,7 @@ import { useUser } from '../contexts/UserContext';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
+import { User } from '../types/User';
 
 function EmailConfirmation() {
     const [code, setCode] = useState<number | undefined>();
@@ -12,7 +13,7 @@ function EmailConfirmation() {
     const location = useLocation();
     const { isPasswordChange, newPassword, confirmPassword } = location.state || {};
     const navigate = useNavigate();
-    const { user } = useUser();
+    const { user, setUser } = useUser();
     const toast = useToast();
 
     useEffect(() => {
@@ -58,6 +59,8 @@ function EmailConfirmation() {
                 return;
             }
             await invoke("confirm_code", { request: { email: user.email, code: code } });
+            const newUser: User = {...user, is_active: true};
+            setUser(newUser);
             navigate('/mainPage');
             toast.success("Email confirmed successfully");
         }

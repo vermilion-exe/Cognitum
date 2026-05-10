@@ -1,5 +1,6 @@
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkBreaks from 'remark-breaks';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 
@@ -21,10 +22,34 @@ function normalizeSummaryMarkdown(text: string) {
         // The summary is usually plain markdown; only unwrap JSON when it is valid JSON.
     }
 
-    return normalized
-        .replace(/\\r\\n/g, "\n")
-        .replace(/\\n/g, "\n")
-        .replace(/\\t/g, "\t");
+    normalized = normalized
+        // Escaped newlines
+        .replace(/\\+r\\+n/g, "\n")
+        .replace(/\\+n/g, "\n")
+        .replace(/\\+t/g, "\t")
+
+        // Real carriage returns
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n");
+
+    // Convert common HTML wrappers back to markdown/newlines.
+    normalized = normalized
+        .replace(/<h1[^>]*>(.*?)<\/h1>/gis, "# $1\n\n")
+        .replace(/<h2[^>]*>(.*?)<\/h2>/gis, "## $1\n\n")
+        .replace(/<h3[^>]*>(.*?)<\/h3>/gis, "### $1\n\n")
+        .replace(/<p[^>]*>/gi, "")
+        .replace(/<\/p>/gi, "\n\n")
+        .replace(/<br\s*\/?>/gi, "\n");
+
+    // Decode common HTML entities.
+    normalized = normalized
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, "\"")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">");
+
+    return normalized.trim();
 }
 
 function SummaryModal({ isLoading, text, onClose, onRegenerate, hasEnoughChars }: { isLoading: boolean; text: string; onClose: () => void; onRegenerate: () => void; hasEnoughChars: boolean; }) {
@@ -53,7 +78,7 @@ function SummaryModal({ isLoading, text, onClose, onRegenerate, hasEnoughChars }
 
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    <div className="prose prose-invert wrap-break-word max-w-none">
+                    <div className="markdown-content max-w-none">
                         {hasEnoughChars ? (
                             isLoading ? (
                                 <div className='flex items-center gap-2'>
@@ -62,7 +87,7 @@ function SummaryModal({ isLoading, text, onClose, onRegenerate, hasEnoughChars }
                                 </div>
                             ) : (
                                 <div aria-label='SummaryContent'>
-                                    <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
+                                    <Markdown remarkPlugins={[remarkMath, remarkBreaks]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
                                         {summaryMarkdown}
                                     </Markdown>
                                 </div>

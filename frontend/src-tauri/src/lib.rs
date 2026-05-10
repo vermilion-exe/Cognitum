@@ -26,7 +26,7 @@ pub fn run() {
             let handle = app.handle().clone();
             app.manage(AppState {
                 client: reqwest::Client::new(),
-                base_url: "http://localhost:8080/api/cognitum".to_string(),
+                base_url: "http://79.72.82.80:8080/api/cognitum".to_string(),
                 app_handle: handle,
                 highlight_mapping_lock: Mutex::new(()),
                 flashcard_mapping_lock: Mutex::new(()),

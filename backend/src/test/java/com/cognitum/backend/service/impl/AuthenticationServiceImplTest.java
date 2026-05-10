@@ -101,7 +101,7 @@ class AuthenticationServiceImplTest {
 
         when(userRepository.findByEmail("newuser@example.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
-        when(applicationProperties.getIsDevMode()).thenReturn(false);
+        when(applicationProperties.getIsTestMode() ).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
         when(jwtService.generateToken(savedUser)).thenReturn("jwt-token");
         when(jwtService.generateRefreshToken(savedUser)).thenReturn("refresh-token");
